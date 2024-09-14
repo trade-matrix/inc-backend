@@ -4,9 +4,22 @@ from accounts.models import Customer
 class Investment(models.Model):
     user = models.ManyToManyField(Customer, related_name='investors', blank=True)
     amount = models.FloatField()
-    title = models.IntegerField()
+    title = models.CharField(max_length=255)
     interest = models.FloatField()
     status = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=False)
     def __str__(self):
         return self.title
+    
+class Wallet(models.Model):
+    user = models.OneToOneField(Customer, on_delete=models.CASCADE)
+    deposit = models.FloatField(default=0.00)
+    balance = models.FloatField(default=0.00)
+    def __str__(self):
+        return self.user.username
+
+class Operator(models.Model):
+    name = models.CharField(max_length=255)
+    code = models.CharField(max_length=10)
+    def __str__(self):
+        return self.name

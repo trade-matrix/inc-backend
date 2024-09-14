@@ -1,4 +1,119 @@
 import requests
+import uuid
+import os
 
-def payment():
-    return True
+def payment(amount, title, name):
+    url = 'https://api.korapay.com/merchant/api/v1/charges/initialize'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer sk_test_odpofrHz53Pz6Sc5Cs1KyBfVGG9cdvL7cPmqcQ64'
+    }
+    data = {
+        "amount": amount,
+        "redirect_url": "http://127.0.0.1:8000/accounts/login",
+        "currency": "GHS",
+        "reference": str(uuid.uuid4()),
+        "narration": f"Payment for {title}",
+        "channels": [
+            "mobile_money",
+        ],
+        "customer": {
+            "name": name,
+            "email": f"{name}@email.com",
+        },
+        "metadata": {
+            "investment": title
+        },
+        "notification_url": "http://127.0.0.1:8000/market/webhook/",
+        "merchant_bears_cost": False
+    }
+
+    response = requests.post(url,headers=headers, json=data)
+
+    if response.status_code == 200:
+        return response.json()  # Returning the response in JSON format if successful
+    else:
+        print( {"error": response.text, "status_code": response.status_code})
+
+def status_check(reference):
+    url = f'https://api.korapay.com/merchant/api/v1/charges/{reference}'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer sk_test_odpofrHz53Pz6Sc5Cs1KyBfVGG9cdvL7cPmqcQ64'
+    }
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print({"error": response.text, "status_code": response.status_code})
+        return False
+
+def send_money(amount, phone_number, operator, user_id):
+    url = 'https://api.korapay.com/merchant/api/v1/transactions/disburse'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer sk_test_odpofrHz53Pz6Sc5Cs1KyBfVGG9cdvL7cPmqcQ64'
+    }
+    data = {
+        "reference": str(uuid.uuid4()),
+        "destination": 
+        {
+            "type": "mobile_money",
+            "amount": amount,
+            "currency": "GHS",
+            "narration": "Test Transfer Payment",
+            "mobile_money": 
+            {
+                "operator": operator,
+                "mobile_number": phone_number
+            },
+            "customer": 
+            {
+                "name": "John Doe",
+                "email": "johndoe@email.com"
+            }
+	    },
+        "metadata": {
+            "phone_number": phone_number,
+            "user_id": user_id  
+        }
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print({"error": response.text, "status_code": response.status_code})
+        return False
+    
+def send_sms(message, number):
+    url = "https://sms.arkesel.com/sms/api"
+    params = {
+        "action": "send-sms",
+        "api_key": os.environ.get("ARK_API_KEY"),
+        "to": number,
+        "from": "TradeMatrix",
+        "sms": message
+    }
+    # Send HTTP GET request
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        print(response.text)
+    except requests.exceptions.RequestException as e:
+        print("An error occurred:", e)
+
+def check_momo(phone_number, operator):
+    url = 'https://api.korapay.com/merchant/api/v1/misc/mobile-money/resolve'
+    data = {
+        "phoneNumber": phone_number,
+        "mobileMoneyCode": operator,
+        "currency": "GHS"
+    }
+    response = requests.post(url, json=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print({"error": response.text, "status_code": response.status_code})
+        return False

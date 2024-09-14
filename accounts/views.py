@@ -10,6 +10,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .exceptions import ExternalAPIError
 import requests
+from market.models import Wallet
 
 class UserRegistrationView(generics.CreateAPIView):
     queryset = Customer.objects.all()
@@ -23,8 +24,12 @@ class UserRegistrationView(generics.CreateAPIView):
                 user = Customer.objects.get(username=request.data['username'])
                 token, _ = Token.objects.get_or_create(user=user)
                 user_id = user.id
+                wallet = Wallet.objects.create(user=user)
+                balance = wallet.balance
                 response.data['token'] = token.key
                 response.data['user_id'] = user_id
+                response.data['balance'] = balance
+                response.data['verified'] = user.verified
             return response
         except ExternalAPIError as e:
             # Here you can customize the response as per your frontend requirements
@@ -97,12 +102,15 @@ class UserOtpVerificationLogin(generics.CreateAPIView):
         if response.status_code == 200 and response.json().get("message") == "Successful":
             token, _ = Token.objects.get_or_create(user=Customer.objects.get(pk=user_id))
             user = Customer.objects.get(pk=user_id)
+            wallet, _ = Wallet.objects.get_or_create(user=user)
             data = {
                 "message": "User logged in successfully",
                 "token": token.key,
                 "user_id": user_id,
                 "username": user.username,
                 "phone_number": user.phone_number,
+                "balance": wallet.balance,
+                "verified": user.verified
             }
             return Response(data, status=200)
         elif response.status_code == 200 and response.json().get("message") == "Code has expired":
