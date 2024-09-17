@@ -7,6 +7,7 @@ class Investment(models.Model):
     title = models.CharField(max_length=255)
     interest = models.FloatField()
     status = models.BooleanField(default=True)
+    image = models.ImageField(upload_to='investment', blank=True)
     created_at = models.DateTimeField(auto_now_add=False)
     def __str__(self):
         return self.title
