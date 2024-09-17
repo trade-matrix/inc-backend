@@ -28,6 +28,11 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
+# Add the following setting to trust your frontend or API domain
+CSRF_TRUSTED_ORIGINS = [
+    'https://api-dkqs.onrender.com',  # The domain causing the CSRF error
+    # Add any other trusted domains here
+]
 
 # Application definition
 
