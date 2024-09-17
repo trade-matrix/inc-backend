@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -53,6 +54,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -81,8 +84,14 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        "URL":os.environ.get("POSTGRES_URL"),
+        "PRISMA_URL":os.environ.get("POSTGRES_PRISMA_URL"),
+        "URL_NON_POOLING":os.environ.get("POSTGRES_URL_NON_POOLING"),
+        "USER":"default",
+        "HOST":os.environ.get("POSTGRES_HOST"),
+        "PASSWORD":os.environ.get("POSTGRES_PASSWORD"),
+        "NAME":os.environ.get("POSTGRES_DATABASE"),
     }
 }
 
@@ -121,7 +130,27 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+STATIC_ROOT = BASE_DIR / "static_root"
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Backblaze B2 S3-Compatible Storage Settings
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+# Your B2 account credentials
+AWS_ACCESS_KEY_ID = '0050e63d27947900000000001'
+AWS_SECRET_ACCESS_KEY = 'K005ciejE154uGe9hIxKMLoQJx2CcLs'
+AWS_STORAGE_BUCKET_NAME = 'darkpass'
+AWS_S3_ENDPOINT_URL = 'https://s3.us-east-005.backblazeb2.com'
+
+# Set the region to match the B2 bucket region
+AWS_S3_REGION_NAME = 'us-east-005'  # Example: us-west-002
+
+# Set the URL to access your media files
+MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.backblazeb2.com/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -134,8 +163,9 @@ ASGI_APPLICATION = 'core.asgi.application'
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],  # Update with your Redis configuration
+        "CONFIG": {
+            "hosts": [os.environ.get('REDIS_URL', 'redis://localhost:6379')],
         },
     },
 }
+CORS_ALLOW_ALL_ORIGINS = True
