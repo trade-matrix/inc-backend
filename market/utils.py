@@ -1,12 +1,12 @@
 import requests
 import uuid
 import os
-
+secret = os.environ.get('Kora_Secret_Key')
 def payment(amount, title, name):
     url = 'https://api.korapay.com/merchant/api/v1/charges/initialize'
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer sk_test_odpofrHz53Pz6Sc5Cs1KyBfVGG9cdvL7cPmqcQ64'
+        'Authorization': f'Bearer {secret}'
     }
     data = {
         "amount": amount,
@@ -40,7 +40,7 @@ def status_check(reference):
     url = f'https://api.korapay.com/merchant/api/v1/charges/{reference}'
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer sk_test_odpofrHz53Pz6Sc5Cs1KyBfVGG9cdvL7cPmqcQ64'
+        'Authorization': f'Bearer {secret}'
     }
 
     response = requests.get(url, headers=headers)
@@ -55,7 +55,7 @@ def send_money(amount, phone_number, operator, user_id):
     url = 'https://api.korapay.com/merchant/api/v1/transactions/disburse'
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer sk_test_odpofrHz53Pz6Sc5Cs1KyBfVGG9cdvL7cPmqcQ64'
+        'Authorization': f'Bearer {secret}'
     }
     data = {
         "reference": str(uuid.uuid4()),
