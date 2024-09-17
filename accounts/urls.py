@@ -9,4 +9,5 @@ urlpatterns = [
     path('verify/', UserOtpVerification.as_view(), name='verify'),
     path('resend-otp/', UserResendOTP.as_view(), name='resend-otp'),
     path('users/', TotalNumberOfUsers.as_view(), name='users'),
+    path('refer/', UserCreateReferalLink.as_view(), name='refer'),
 ]

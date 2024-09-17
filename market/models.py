@@ -23,3 +23,21 @@ class Operator(models.Model):
     code = models.CharField(max_length=10)
     def __str__(self):
         return self.name
+
+class Transaction(models.Model):
+    choices = [
+        ('deposit', 'Investment'),
+        ('withdraw', 'Withdraw'),
+        ('referal', 'Referal'),
+    ]
+    state = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+    ]
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    amount = models.FloatField()
+    status = models.CharField(max_length=255, choices=state)
+    type = models.CharField(max_length=255, choices=choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+    def __str__(self):
+        return self.user.username

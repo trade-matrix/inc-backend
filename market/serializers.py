@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Investment
+from .models import Investment, Transaction, Wallet, Operator
 
 class InvestmentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,3 +19,18 @@ class Withdraw(serializers.Serializer):
 
 class CheckMomoSerializer(serializers.Serializer):
     operator = serializers.CharField()
+
+class OperatorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Operator
+        fields = '__all__'
+
+class TransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = '__all__'
+
+class WalletSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Wallet
+        fields = '__all__'

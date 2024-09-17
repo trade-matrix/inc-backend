@@ -34,6 +34,7 @@ def payment(amount, title, name):
         return response.json()  # Returning the response in JSON format if successful
     else:
         print( {"error": response.text, "status_code": response.status_code})
+        return False
 
 def status_check(reference):
     url = f'https://api.korapay.com/merchant/api/v1/charges/{reference}'

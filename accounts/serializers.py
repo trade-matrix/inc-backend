@@ -3,6 +3,9 @@ from rest_framework import serializers
 from .models import *
 import requests
 import os
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from market.models import Transaction
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     referal_code = serializers.CharField(required=False)
@@ -45,8 +48,26 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         if validated_data.get('referal_code'):
             try:
                 referal_user = Customer.objects.get(username=validated_data.get('referal_code'))
-                referal_user.referred_users.add(user)
-                referal_user.save()
+                user.referred_by = referal_user
+                user.save()
+                transaction = Transaction.objects.create(user=referal_user, amount=0.00, status='pending', type='referal')
+                # Send Transsaction to WebSocket
+                channel_layer = get_channel_layer()
+                transaction_data = {
+                    'id': transaction.id,
+                    'user': transaction.user.id,  # Assuming you're using the user's ID
+                    'amount': transaction.amount,
+                    'status': transaction.status,
+                    'type': transaction.type,
+                    'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
+                }
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{referal_user.id}",
+                    {
+                        'type': 'send_user_transaction',
+                        'transaction': transaction_data
+                    }
+                )
             except Customer.DoesNotExist:
                 pass
         return user

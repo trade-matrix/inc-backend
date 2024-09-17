@@ -37,3 +37,8 @@ class BalanceConsumer(WebsocketConsumer):
         self.send(text_data=json.dumps({
             'user_verified': True
         }))
+    
+    def send_user_transaction(self, event):
+        self.send(text_data=json.dumps({
+            'transaction': event['transaction']
+        }))
