@@ -8,6 +8,6 @@ class Customer(AbstractUser):
     REQUIRED_FIELDS = ['phone_number']
     referred_by = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True)
     verified = models.BooleanField(default=False)
-    reference = models.CharField(max_length=10, blank=True, null=True)
+    reference = models.CharField(max_length=255, blank=True, null=True)
     referal_code = models.CharField(max_length=255, blank=True, null=True)
    
