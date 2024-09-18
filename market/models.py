@@ -16,6 +16,9 @@ class Wallet(models.Model):
     user = models.OneToOneField(Customer, on_delete=models.CASCADE)
     deposit = models.FloatField(default=0.00)
     balance = models.FloatField(default=0.00)
+    eligible = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+    date_made_eligible = models.DateTimeField(auto_now_add=False, blank=True, null=True)
     def __str__(self):
         return self.user.username
 

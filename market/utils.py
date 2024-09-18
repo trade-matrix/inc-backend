@@ -22,7 +22,8 @@ def payment(amount, title, name):
             "email": f"{name}@email.com",
         },
         "metadata": {
-            "investment": title
+            "investment": title,
+            'username': name
         },
         "notification_url": "http://127.0.0.1:8000/market/webhook/",
         "merchant_bears_cost": False

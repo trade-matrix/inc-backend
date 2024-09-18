@@ -15,6 +15,7 @@ from django.views import View
 from django.utils.decorators import method_decorator
 import json
 from django.views.decorators.csrf import csrf_exempt
+import datetime
 
 class InvestmentListView(generics.ListAPIView):
     queryset = Investment.objects.all()
@@ -184,6 +185,16 @@ class WebhookView(View):
                     }
                 )
                 send_sms("Your withdrawal failed. Your balance has been reverted.", phone_number)   
+            elif payload.get('event') == 'charge.success':
+                reference = payload['data']['reference']
+                user = Customer.objects.get(reference=reference)
+                wallet,_ = Wallet.objects.get_or_create(user=user)
+                
+                # Update the wallet balance
+                wallet.active = True
+                wallet.eligible = True
+                wallet.date_made_eligible = datetime.datetime.now()
+                wallet.save()
 
             # Respond with a success message
             return JsonResponse({"message": "Webhook received successfully"}, status=200)
