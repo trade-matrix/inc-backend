@@ -179,7 +179,7 @@ CHANNEL_LAYERS = {
 }
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173","https://store-manager-ten.vercel.app"
+    "http://localhost:5173","https://store-manager-ten.vercel.app", 'https://trade-matrix.vercel.app','https://trade-matrix.com'
 ]
 ORS_ALLOW_METHODS = [
     "GET",
