@@ -11,6 +11,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from .exceptions import ExternalAPIError
 import requests
 from market.models import Wallet
+from .utils import send_otp
 
 class UserRegistrationView(generics.CreateAPIView):
     queryset = Customer.objects.all()
@@ -94,7 +95,12 @@ class UserLoginView(generics.CreateAPIView):
         try:
             user = Customer.objects.get(phone_number=phone_number)
             if user.is_active == False:
-                raise AuthenticationFailed(detail="User is not verified")
+                send_otp(user.phone_number, user.username)
+                data = {
+                    "message": "User not verified",
+                    "user_id": user.id
+                }
+                return Response(data, status=status.HTTP_404_NOT_FOUND)
         except Customer.DoesNotExist:
             raise AuthenticationFailed(detail="Invalid Phone Number")
 
@@ -118,7 +124,6 @@ class UserLoginView(generics.CreateAPIView):
         try:
             response = requests.post(url, json=data, headers=headers)
             if response.status_code != 200:
-                user.delete()
                 raise ExternalAPIError(response.status_code, response.json())
             else:
                 data = {
