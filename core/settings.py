@@ -196,6 +196,6 @@ CORS_ALLOW_HEADERS = [
     "Accept",
     "Origin",
     "http_x_csrftoken",
-    "access-control-allow-headers",
-    "access-control-allow-origin" # Add the CSRF token header
+    "Access-Control-Allow-Headers",
+    "Access-Control-Allow-Origin" # Add the CSRF token header
 ]
