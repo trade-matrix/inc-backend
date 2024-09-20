@@ -34,3 +34,6 @@ class WalletSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wallet
         fields = '__all__'
+
+class PredictionSerializer(serializers.Serializer):
+    prediction = serializers.CharField()

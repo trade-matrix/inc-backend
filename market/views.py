@@ -16,6 +16,7 @@ from django.utils.decorators import method_decorator
 import json
 from django.views.decorators.csrf import csrf_exempt
 import datetime
+from datetime import datetime, timedelta
 
 class InvestmentListView(generics.ListAPIView):
     queryset = Investment.objects.all()
@@ -120,8 +121,10 @@ class VerifyPayment(APIView):
                         "new_balance": referrer_wallet.balance,
                     }
                 )
-                send_sms(f"You’ll receive 85% of your returns since you were referred by {user.referred_by.username}. Refer more people to boost your earnings!", user.phone_number)
+                send_sms(f"Dear customer, you are eligible to receive 85% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
                 send_sms(f"Congratulations! You just earned 15% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
+                return Response({"message": "Payment successful"}, status=status.HTTP_200_OK)
+            send_sms(f"Congratulations! Your investment has been successful. You can withdraw your returns after the target is reached. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
             return Response({"message": "Payment successful"}, status=status.HTTP_200_OK)
         if not status_chec:
             return Response({"error": "Invalid reference"}, status=status.HTTP_400_BAD_REQUEST)
@@ -243,3 +246,21 @@ class UserWalletView(APIView):
             "deposit": wallet.deposit
         }
         return Response(data, status=status.HTTP_200_OK)
+
+#Worker APIS
+# worker to increase balance in all active wallets according to number of users created in that day.
+import random
+class IncreaseBalance(APIView):
+    def get(self, request, *args, **kwargs):
+        start_of_day = datetime.combine(datetime.now().date(), datetime.min.time())
+        end_of_day = datetime.combine(datetime.now().date(), datetime.max.time())
+        
+        number_of_users = Customer.objects.filter(date_joined__range=(start_of_day, end_of_day)).count()
+        wallets = Wallet.objects.filter(active=True)
+        for wallet in wallets:
+            wallet.balance += 0.01 * number_of_users
+            wallet.save()
+            send_sms(f"Congratulations! Your balance has been increased by GHS {0.01 * number_of_users} Today.", wallet.user.phone_number)
+        return Response({"message": "Balances increased successfully"}, status=status.HTTP_200_OK)
+
+#User predictions
