@@ -22,14 +22,8 @@ class UserRegistrationView(generics.CreateAPIView):
             response = super().post(request, *args, **kwargs)
             if response.status_code == status.HTTP_201_CREATED:
                 user = Customer.objects.get(username=request.data['username'])
-                token, _ = Token.objects.get_or_create(user=user)
                 user_id = user.id
-                wallet = Wallet.objects.create(user=user)
-                balance = wallet.balance
-                response.data['token'] = token.key
                 response.data['user_id'] = user_id
-                response.data['balance'] = balance
-                response.data['verified'] = user.verified
             return response
         except ExternalAPIError as e:
             # Here you can customize the response as per your frontend requirements
@@ -66,14 +60,15 @@ class UserOtpVerification(generics.CreateAPIView):
             user.is_active = True
             user.save()
             token, _ = Token.objects.get_or_create(user=user)
+            walet, _ = Wallet.objects.get_or_create(user=user)
             data = {
                 "message": "User verified",
                 "user_id": user_id,
                 "username": user.username,
                 "phone_number": user.phone_number,
                 "verified": user.verified,
-                "token": token.key
-
+                "token": token.key,
+                "balance": walet.balance
             }
             return Response(data, status=200)
         elif response.status_code == 200 and response.json().get("message") == "Code has expired":
