@@ -30,9 +30,13 @@ ALLOWED_HOSTS = ["*"]
 
 # Add the following setting to trust your frontend or API domain
 CSRF_TRUSTED_ORIGINS = [
-    'https://api-dkqs.onrender.com',  # The domain causing the CSRF error
+    'https://api-dkqs.onrender.com','https://192.168.43.142:8081',"http://localhost:5173"  # The domain causing the CSRF error
     # Add any other trusted domains here
 ]
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_NAME = "csrftoken"
+CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 
 # Application definition
 
@@ -173,4 +177,25 @@ CHANNEL_LAYERS = {
         },
     },
 }
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173","https://store-manager-ten.vercel.app"
+]
+ORS_ALLOW_METHODS = [
+    "GET",
+    "POST",
+    "PUT",
+    "DELETE",
+    "OPTIONS",
+]
+
+CORS_ALLOW_HEADERS = [
+    "Content-type",
+    "Authorization",
+    "x-requested-with",
+    "Accept",
+    "Origin",
+    "http_x_csrftoken",
+    "access-control-allow-headers",
+    "access-control-allow-origin" # Add the CSRF token header
+]
