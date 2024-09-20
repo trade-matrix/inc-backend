@@ -57,8 +57,9 @@ class UserOtpVerification(generics.CreateAPIView):
         if response.status_code == 200 and response.json().get("message") == "Successful":
             print(response.json())
             user = Customer.objects.get(pk=user_id)
-            user.is_active = True
-            user.save()
+            if not user.is_active:
+                user.is_active = True
+                user.save()
             token, _ = Token.objects.get_or_create(user=user)
             walet, _ = Wallet.objects.get_or_create(user=user)
             data = {
@@ -70,53 +71,6 @@ class UserOtpVerification(generics.CreateAPIView):
                 "token": token.key,
                 "balance": walet.balance
             }
-            return Response(data, status=200)
-        elif response.status_code == 200 and response.json().get("message") == "Code has expired":
-            return Response({"message": "Code has expired"}, status=400)
-        elif response.status_code == 200 and response.json().get("message") == "Invalid code":
-            return Response({"message": "Code incorrect"}, status=400)
-        else:
-            print(f"Error: {response.status_code} and {response.json()}")
-            return Response({"message": "Code incorrect"}, status=400)
-
-class UserOtpVerificationLogin(generics.CreateAPIView):
-    queryset = Customer.objects.all()
-    serializer_class = UserOtpVerificationSerializer
-    permission_classes = [AllowAny]
-    
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        code = serializer.validated_data.get('code')
-        user_id = serializer.validated_data.get('user_id')
-        phone = Customer.objects.get(pk=user_id).phone_number
-        data = {
-            "code": code,
-            "number": phone,
-        }
-
-        headers = {
-        'api-key': os.environ.get('ARK_API_KEY'),
-        }
-
-        url = 'https://sms.arkesel.com/api/otp/verify'
-
-        response = requests.post(url, json=data, headers=headers)
-        print(response.json())
-        if response.status_code == 200 and response.json().get("message") == "Successful":
-            token, _ = Token.objects.get_or_create(user=Customer.objects.get(pk=user_id))
-            user = Customer.objects.get(pk=user_id)
-            wallet, _ = Wallet.objects.get_or_create(user=user)
-            data = {
-                "message": "User logged in successfully",
-                "token": token.key,
-                "user_id": user_id,
-                "username": user.username,
-                "phone_number": user.phone_number,
-                "balance": wallet.balance,
-                "verified": user.verified
-            }
             login(request, user)
             return Response(data, status=200)
         elif response.status_code == 200 and response.json().get("message") == "Code has expired":
@@ -126,7 +80,7 @@ class UserOtpVerificationLogin(generics.CreateAPIView):
         else:
             print(f"Error: {response.status_code} and {response.json()}")
             return Response({"message": "Code incorrect"}, status=400)
- 
+
 class UserLoginView(generics.CreateAPIView):
     serializer_class = UserLoginSerializer
     permission_classes = [AllowAny]
