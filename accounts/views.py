@@ -65,7 +65,17 @@ class UserOtpVerification(generics.CreateAPIView):
             user = Customer.objects.get(pk=user_id)
             user.is_active = True
             user.save()
-            return Response({"message": "User is verified"}, status=200)
+            token, _ = Token.objects.get_or_create(user=user)
+            data = {
+                "message": "User verified",
+                "user_id": user_id,
+                "username": user.username,
+                "phone_number": user.phone_number,
+                "verified": user.verified,
+                "token": token.key
+
+            }
+            return Response(data, status=200)
         elif response.status_code == 200 and response.json().get("message") == "Code has expired":
             return Response({"message": "Code has expired"}, status=400)
         elif response.status_code == 200 and response.json().get("message") == "Invalid code":
