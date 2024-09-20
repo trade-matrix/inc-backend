@@ -89,50 +89,18 @@ class UserLoginView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         phone_number = serializer.validated_data['phone_number']
-        
         try:
             user = Customer.objects.get(phone_number=phone_number)
-            if user.is_active == False:
-                send_otp(user.phone_number, user.username)
-                data = {
-                    "message": "User not verified",
-                    "user_id": user.id
-                }
-                return Response(data, status=status.HTTP_404_NOT_FOUND)
         except Customer.DoesNotExist:
             raise AuthenticationFailed(detail="Invalid Phone Number")
 
-        message = f"Hello {user.username},"
+        send_otp(user.phone_number, user.username)
         data = {
-        'expiry': 5,
-        'length': 6,
-        'medium': 'sms',
-        'message': message+' This is your login OTP code:\n%otp_code%\nPlease do not share this code with anyone.',
-        'number': user.phone_number,
-        'sender_id': 'TradeMatrix',
-        'type': 'numeric',
+            "message": "OTP sent",
+            "user_id": user.id
         }
-
-        headers = {
-        'api-key': os.environ.get('ARK_API_KEY'),
-        }
-
-        url = 'https://sms.arkesel.com/api/otp/generate'
-
-        try:
-            response = requests.post(url, json=data, headers=headers)
-            if response.status_code != 200:
-                raise ExternalAPIError(response.status_code, response.json())
-            else:
-                data = {
-                    "message": "OTP sent",
-                    "user_id": user.id
-                }
-                return Response(data, status=status.HTTP_200_OK)
-        except requests.RequestException as e:
-            raise ExternalAPIError(500, str(e))
+        return Response(data, status=status.HTTP_200_OK)
 
 class UserLogoutView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
