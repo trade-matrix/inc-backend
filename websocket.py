@@ -3,8 +3,8 @@ import json
 import websockets
 
 async def test():
-    token = "69c8e96ffe6781aa582b95e360826b32febe6f20"
-    async with websockets.connect(f"ws://127.0.0.1:8000/ws/balance/?token={token}") as websocket:
+    token = "0cb3431a6a8d1e2e905779b806c7d3cba8d48807"
+    async with websockets.connect(f"wss://api-dkqs.onrender.com/ws/balance/?token={token}") as websocket:
         # Listen for messages
         while True:
             message = await websocket.recv()
