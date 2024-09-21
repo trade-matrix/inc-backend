@@ -10,4 +10,6 @@ urlpatterns = [
     path('check/', CheckUserMomo.as_view(), name='check'),
     path('transactions/', TransactionListView.as_view(), name='transactions'),
     path('wallet/', UserWalletView.as_view(), name='wallet'),
+    path('increase-balace/', IncreaseBalance.as_view(), name='increase-wallet'),
+    path('comment/', CommentView.as_view(), name='comment'),
 ]

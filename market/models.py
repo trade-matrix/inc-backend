@@ -45,3 +45,11 @@ class Transaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         return self.user.username
+
+class Comment(models.Model):
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    comment = models.TextField()
+    name = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=False)
+    def __str__(self):
+        return self.user.username

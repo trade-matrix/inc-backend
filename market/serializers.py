@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Investment, Transaction, Wallet, Operator
+from .models import Investment, Transaction, Wallet, Operator, Comment
+import datetime
 
 class InvestmentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -37,3 +38,16 @@ class WalletSerializer(serializers.ModelSerializer):
 
 class PredictionSerializer(serializers.Serializer):
     prediction = serializers.CharField()
+
+class CommentSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=False)
+    user = serializers.StringRelatedField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True, required=False)
+    class Meta:
+        model = Comment
+        fields = '__all__'
+    
+    def create(self, validated_data):
+        if not validated_data.get('created_at'):
+            validated_data['created_at'] = datetime.datetime.now()
+        return Comment.objects.create(**validated_data)

@@ -4,8 +4,8 @@ from rest_framework import permissions
 from .models import Investment
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from .models import Wallet, Operator, Transaction
-from .serializers import InvestmentSerializer, RequesttoInvest, ConfirmPayment, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer
+from .models import Wallet, Operator, Transaction, Comment
+from .serializers import InvestmentSerializer, RequesttoInvest, ConfirmPayment, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer, CommentSerializer
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer
@@ -16,7 +16,9 @@ from django.utils.decorators import method_decorator
 import json
 from django.views.decorators.csrf import csrf_exempt
 import datetime
-from datetime import datetime, timedelta
+from datetime import datetime
+#pagination
+from rest_framework.pagination import PageNumberPagination
 
 class InvestmentListView(generics.ListAPIView):
     queryset = Investment.objects.all()
@@ -68,7 +70,7 @@ class VerifyPayment(APIView):
             wallet,_ = Wallet.objects.get_or_create(user=user)
             
             # Update the wallet balance
-            wallet.balance += float(status_chec['data']['amount_paid'])*investment.interest
+            wallet.balance += float(status_chec['data']['amount_paid'])*investment.interest+float(status_chec['data']['amount_paid'])
             wallet.deposit = float(status_chec['data']['amount_paid'])  # For example, adding a deposit
             wallet.save()
             # Create a transaction record
@@ -249,7 +251,6 @@ class UserWalletView(APIView):
 
 #Worker APIS
 # worker to increase balance in all active wallets according to number of users created in that day.
-import random
 class IncreaseBalance(APIView):
     def get(self, request, *args, **kwargs):
         start_of_day = datetime.combine(datetime.now().date(), datetime.min.time())
@@ -263,4 +264,37 @@ class IncreaseBalance(APIView):
             send_sms(f"Congratulations! Your balance has been increased by GHS {0.01 * number_of_users} Today.", wallet.user.phone_number)
         return Response({"message": "Balances increased successfully"}, status=status.HTTP_200_OK)
 
-#User predictions
+#List Top Earners
+class TopEarners(APIView):
+    def get(self, request, *args, **kwargs):
+        wallets = Wallet.objects.all().order_by('-balance')[:5]
+        data = []
+        for wallet in wallets:
+            data.append({
+                "username": wallet.user.username,
+                "balance": wallet.balance,
+                "deposit": wallet.deposit
+            })
+        return Response(data, status=status.HTTP_200_OK)
+
+#User Comments
+class CommentView(generics.ListCreateAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    pagination_class = PageNumberPagination
+
+    
+    def get_queryset(self):
+        return Comment.objects.all().order_by('-created_at')
+    
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+    
+    def post(self, request, *args, **kwargs):
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

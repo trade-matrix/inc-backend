@@ -16,3 +16,14 @@ class OperatorAdmin(admin.ModelAdmin):
     list_display = ['name', 'code']
     search_fields = ['name', 'code']
 admin.site.register(Operator, OperatorAdmin)
+
+class TransactionAdmin(admin.ModelAdmin):
+    list_display = ['user', 'amount', 'status', 'type', 'created_at']
+    list_filter = ['status', 'type', 'created_at']
+    search_fields = ['user']
+admin.site.register(Transaction, TransactionAdmin)
+
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ['user', 'comment', 'name', 'created_at']
+    search_fields = ['user', 'name']
+admin.site.register(Comment, CommentAdmin)

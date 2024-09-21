@@ -63,6 +63,7 @@ class UserOtpVerification(generics.CreateAPIView):
                 user.save()
             token, _ = Token.objects.get_or_create(user=user)
             walet, _ = Wallet.objects.get_or_create(user=user)
+            earnings = walet.balance-walet.deposit
             data = {
                 "message": "User verified",
                 "user_id": user_id,
@@ -70,7 +71,9 @@ class UserOtpVerification(generics.CreateAPIView):
                 "phone_number": user.phone_number,
                 "verified": user.verified,
                 "token": token.key,
-                "balance": walet.balance
+                "balance": walet.balance,
+                "earnings": earnings,
+                "deposit": walet.deposit,
             }
             login(request, user)
             return Response(data, status=200)
