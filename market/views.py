@@ -172,6 +172,15 @@ class WebhookView(View):
             # Here you can handle the notification (e.g., update your database, etc.)
             if payload.get('event') == 'transfer.success':
                 phone_number = payload['metadata']['phone_number']
+                user_id = payload['metadata']['user_id']
+                investment = Investment.objects.get(title=payload['metadata']['investment'])
+                wallet = Wallet.objects.get(user=user_id)
+                wallet.active = False
+                wallet.balance = 0
+                wallet.deposit = 0
+                wallet.save()
+                investment.user.remove(user_id)
+                investment.save()
                 send_sms("Your withdrawal was successful", phone_number)
             elif payload.get('event') == 'transfer.failed':
                 phone_number = payload['metadata']['phone_number']
