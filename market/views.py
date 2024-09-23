@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, ConfirmPayment, 
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer
-from .utils import payment, status_check, send_money, send_sms, check_momo
+from .utils import send_money, send_sms, check_momo, paystack_payment, paystack_status_check
 from django.http import JsonResponse
 from django.views import View
 from django.utils.decorators import method_decorator
@@ -43,7 +43,7 @@ class UserInvest(APIView):
             user = request.user
             pk = request.data.get('id')
             investment = Investment.objects.get(pk=pk)
-            payment_response = payment(investment.amount, investment.title, user.username)
+            payment_response = paystack_payment(investment.amount, investment.title, user.username)
             if not payment_response:
                 return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
             reference = payment_response['data']['reference']
@@ -58,23 +58,23 @@ class UserInvest(APIView):
 class VerifyPayment(APIView):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication, SessionAuthentication]
-    serializer_class = ConfirmPayment
-    def post(self, request, *args, **kwargs):
-        reference = request.data.get('reference')
-        status_chec = status_check(reference)
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        reference = user.reference
+        status_chec = paystack_status_check(reference)
         if status_chec['data']['status'] == 'success':
-            user = Customer.objects.get(reference=reference)
             user.verified = True
             user.save()
             investment = Investment.objects.get(title=status_chec['data']['metadata']['investment'])
             wallet,_ = Wallet.objects.get_or_create(user=user)
             
             # Update the wallet balance
-            wallet.balance += float(status_chec['data']['amount_paid'])*investment.interest+float(status_chec['data']['amount_paid'])
-            wallet.deposit = float(status_chec['data']['amount_paid'])  # For example, adding a deposit
+            wallet.balance += (float(status_chec['data']['amount'])*(investment.interest)) + float(status_chec['data']['amount'])
+            wallet.deposit = float(status_chec['data']['amount'])  # For example, adding a deposit
             wallet.save()
             # Create a transaction record
-            transaction = Transaction.objects.create(user=user, amount=float(status_chec['data']['amount_paid']), status='completed', type='deposit')
+            transaction = Transaction.objects.create(user=user, amount=float(status_chec['data']['amount']), status='completed', type='deposit')
             # Serialize the transaction into JSON-serializable data
             transaction_data = {
                 'id': transaction.id,
@@ -113,9 +113,9 @@ class VerifyPayment(APIView):
             )
             if user.referred_by:
                 referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
-                referrer_wallet.balance += float(status_chec['data']['amount_paid'])*investment.interest*0.15
+                referrer_wallet.balance += float(status_chec['data']['amount'])*investment.interest*0.15
                 referrer_wallet.save()
-                transaction = Transaction.objects.create(user=user.referred_by, amount=float(status_chec['data']['amount_paid'])*investment.interest*0.15, status='completed', type='referal')
+                transaction = Transaction.objects.create(user=user.referred_by, amount=float(status_chec['data']['amount'])*investment.interest*0.15, status='completed', type='referal')
                 async_to_sync(channel_layer.group_send)(
                     f"user_{user.referred_by.id}",
                     {
@@ -123,7 +123,7 @@ class VerifyPayment(APIView):
                         "new_balance": referrer_wallet.balance,
                     }
                 )
-                send_sms(f"Dear customer, you are eligible to receive 85% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
+                send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 85% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
                 send_sms(f"Congratulations! You just earned 15% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
                 return Response({"message": "Payment successful"}, status=status.HTTP_200_OK)
             send_sms(f"Congratulations! Your investment has been successful. You can withdraw your returns after the target is reached. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)

@@ -2,6 +2,9 @@ import requests
 import uuid
 import os
 secret = os.environ.get('Kora_Secret_Key')
+pay_stack_secret = os.environ.get('pay_stack_secret')
+
+#KORA PAY FUNCTIONS
 def payment(amount, title, name):
     url = 'https://api.korapay.com/merchant/api/v1/charges/initialize'
     headers = {
@@ -119,3 +122,42 @@ def check_momo(phone_number, operator):
     else:
         print({"error": response.text, "status_code": response.status_code})
         return False
+
+
+#PAYSTACK FUNCTIONS
+def paystack_payment(amount, title, name):
+    url = 'https://api.paystack.co/transaction/initialize'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {pay_stack_secret}'
+    }
+    print(headers)
+    data = {
+        "amount": amount*100,
+        "email": f"{name}@email.com",
+        "reference": str(uuid.uuid4()),
+        "metadata": {
+            "investment": title,
+            'username': name
+        },
+        "channels": ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer", "eft"]
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print({"error": response.text, "status_code": response.status_code})
+        return False
+
+def paystack_status_check(reference):
+    url = f'https://api.paystack.co/transaction/verify/{reference}'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {pay_stack_secret}'
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print({"error": response.text, "status_code": response.status_code})
+        return False  
