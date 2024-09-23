@@ -9,4 +9,6 @@ urlpatterns = [
     path('resend-otp/', UserResendOTP.as_view(), name='resend-otp'),
     path('users/', TotalNumberOfUsers.as_view(), name='users'),
     path('refer/', UserCreateReferalLink.as_view(), name='refer'),
+    path('referals/', GetRefferedUsers.as_view(), name='referals'),
+    path('investments/', GetUserInvestments.as_view(), name='investments'),
 ]

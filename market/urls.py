@@ -11,5 +11,7 @@ urlpatterns = [
     path('transactions/', TransactionListView.as_view(), name='transactions'),
     path('wallet/', UserWalletView.as_view(), name='wallet'),
     path('increase-balace/', IncreaseBalance.as_view(), name='increase-wallet'),
+    path('remove-eligible/', RemoveWalletEligibility.as_view(), name='remove-eligible'),
     path('comment/', CommentView.as_view(), name='comment'),
+    path('top-earners/', TopEarners.as_view(), name='top-earners'),
 ]

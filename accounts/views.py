@@ -10,7 +10,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .exceptions import ExternalAPIError
 import requests
-from market.models import Wallet
+from market.models import Wallet, Investment
 from .utils import send_otp
 
 class UserRegistrationView(generics.CreateAPIView):
@@ -153,7 +153,7 @@ class TotalNumberOfUsers(generics.GenericAPIView):
     permission_classes = [AllowAny]
     def get(self, request, *args, **kwargs):
         users = Customer.objects.all().count()
-        user_percentage = (users/200000)
+        user_percentage = (users/200000)*100
         data = {
             "total_users": users,
             "user_percentage": user_percentage
@@ -169,5 +169,27 @@ class UserCreateReferalLink(generics.GenericAPIView):
         data = {
             "referal_link": referal_link,
             "message": "Referal link created successfully"
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+class GetRefferedUsers(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication,SessionAuthentication]
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        refered_users = Customer.objects.filter(referal=user)
+        data = {
+            "data": refered_users
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+class GetUserInvestments(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication,SessionAuthentication]
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        investments = Investment.objects.filter(user=user)
+        data = {
+            "data": investments
         }
         return Response(data, status=status.HTTP_200_OK)
