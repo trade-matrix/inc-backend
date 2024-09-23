@@ -198,7 +198,7 @@ class WebhookView(View):
                 # Update the wallet balance
                 wallet.active = True
                 wallet.eligible = True
-                wallet.date_made_eligible = datetime.datetime.now()
+                wallet.date_made_eligible = datetime.now()
                 wallet.save()
 
             # Respond with a success message
