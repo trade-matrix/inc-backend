@@ -305,9 +305,9 @@ class WebhookView(View):
                     )
                     send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 85% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
                     send_sms(f"Congratulations! You just earned 15% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
-                    return Response({"message": "Payment successful"}, status=status.HTTP_200_OK)
+                    return Response({"message": "Payment successful"}, status=200)
                 send_sms(f"Congratulations! Your investment has been made successful. You can withdraw your returns after the target is reached. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
-                return Response({"message": "Payment successful"}, status=status.HTTP_200_OK)
+                return Response({"message": "Payment successful"}, status=200)
 
             # Respond with a success message
             return JsonResponse({"message": "Webhook received successfully"}, status=200)
@@ -372,6 +372,15 @@ class IncreaseBalance(APIView):
             send_sms(f"Congratulations! Your balance has been increased by GHS {0.01 * number_of_users} Today.", wallet.user.phone_number)
         return Response({"message": "Balances increased successfully"}, status=status.HTTP_200_OK)
 
+class RemoveWalletEligibility(APIView):
+    def get(self, request, *args, **kwargs):
+        start_of_day = datetime.combine(datetime.now().date(), datetime.min.time())
+        end_of_day = datetime.combine(datetime.now().date(), datetime.max.time())
+        wallets = Wallet.objects.filter(active=True, eligible=True, date_made_eligible__range=(start_of_day, end_of_day))
+        for wallet in wallets:
+            wallet.eligible = False
+            wallet.save()
+        return Response({"message": "Wallets made ineligible successfully"}, status=status.HTTP_200_OK)
 #List Top Earners
 class TopEarners(APIView):
     def get(self, request, *args, **kwargs):
