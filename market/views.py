@@ -193,13 +193,74 @@ class WebhookView(View):
             elif payload.get('event') == 'charge.success':
                 reference = payload['data']['reference']
                 user = Customer.objects.get(reference=reference)
+                user.verified = True
+                user.save()
+                investment = Investment.objects.get(title=payload['data']['metadata']['investment'])
                 wallet,_ = Wallet.objects.get_or_create(user=user)
                 
+                # Update the wallet balance
+                wallet.balance += (float(payload['data']['amount'])*(investment.interest)) + float(payload['data']['amount'])
+                wallet.deposit = float(payload['data']['amount'])  # For example, adding a deposit
                 # Update the wallet balance
                 wallet.active = True
                 wallet.eligible = True
                 wallet.date_made_eligible = datetime.now()
                 wallet.save()
+                # Create a transaction record
+                transaction = Transaction.objects.create(user=user, amount=float(payload['data']['amount']), status='completed', type='deposit')
+                # Serialize the transaction into JSON-serializable data
+                transaction_data = {
+                    'id': transaction.id,
+                    'user': transaction.user.id,  # Assuming you're using the user's ID
+                    'amount': transaction.amount,
+                    'status': transaction.status,
+                    'type': transaction.type,
+                    'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
+                }
+
+                # Send the serialized transaction to the WebSocket consumer
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{user.id}",
+                    {
+                        "type": "send_user_transaction",
+                        "transaction": transaction_data  # Send the serialized data
+                    }
+                )
+
+                # Send balance update to the WebSocket consumer
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{user.id}",  # Unique group for each user
+                    {
+                        "type": "send_balance_update",
+                        "new_balance": wallet.balance,
+                    }
+                )
+                investment.user.add(user)
+                investment.save()
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{user.id}",
+                    {
+                        "type": "send_user_verified",
+                    }
+                )
+                if user.referred_by:
+                    referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
+                    referrer_wallet.balance += float(payload['data']['amount'])*investment.interest*0.15
+                    referrer_wallet.save()
+                    transaction = Transaction.objects.create(user=user.referred_by, amount=float(payload['data']['amount'])*investment.interest*0.15, status='completed', type='referal')
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{user.referred_by.id}",
+                        {
+                            "type": "send_balance_update",
+                            "new_balance": referrer_wallet.balance,
+                        }
+                    )
+                    send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 85% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
+                    send_sms(f"Congratulations! You just earned 15% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
+                    return Response({"message": "Payment successful"}, status=status.HTTP_200_OK)
+                send_sms(f"Congratulations! Your investment has been successful. You can withdraw your returns after the target is reached. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
+                return Response({"message": "Payment successful"}, status=status.HTTP_200_OK)
 
             # Respond with a success message
             return JsonResponse({"message": "Webhook received successfully"}, status=200)
