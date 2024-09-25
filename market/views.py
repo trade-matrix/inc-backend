@@ -5,7 +5,7 @@ from .models import Investment
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Wallet, Operator, Transaction, Comment
-from .serializers import InvestmentSerializer, RequesttoInvest, ConfirmPayment, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer, CommentSerializer
+from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerializer, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer, CommentSerializer
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer
@@ -179,6 +179,19 @@ class WebhookView(View):
                 wallet.balance = 0
                 wallet.deposit = 0
                 wallet.save()
+                # Send balance update to the WebSocket consumer
+                balance_data ={
+                    "new_balance": wallet.balance,
+                    "earnings": wallet.balance - wallet.deposit
+                }
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{user_id}",  # Unique group for each user
+                    {
+                        "type": "send_balance_update",
+                        "new_balance": balance_data,
+                    }
+                )
                 investment.user.remove(user_id)
                 investment.save()
                 send_sms("Your withdrawal was successful", phone_number)
@@ -191,11 +204,15 @@ class WebhookView(View):
 
                 # Send balance update to the WebSocket consumer
                 channel_layer = get_channel_layer()
+                balance_data ={
+                    "new_balance": wallet.balance,
+                    "earnings": wallet.balance - wallet.deposit
+                }
                 async_to_sync(channel_layer.group_send)(
                     f"user_{user_id}",  # Unique group for each user
                     {
                         "type": "send_balance_update",
-                        "new_balance": wallet.balance,
+                        "new_balance": balance_data,
                     }
                 )
                 send_sms("Your withdrawal failed. Your balance has been reverted.", phone_number)   
@@ -240,11 +257,15 @@ class WebhookView(View):
                     )
 
                     # Send balance update to the WebSocket consumer
+                    balance_data ={
+                        "new_balance": wallet.balance,
+                        "earnings": wallet.balance - wallet.deposit
+                    }
                     async_to_sync(channel_layer.group_send)(
                         f"user_{user.id}",  # Unique group for each user
                         {
                             "type": "send_balance_update",
-                            "new_balance": wallet.balance,
+                            "new_balance": balance_data,
                         }
                     )
                     investment.user.add(user)
@@ -286,11 +307,15 @@ class WebhookView(View):
                     )
 
                     # Send balance update to the WebSocket consumer
+                    balance_data ={
+                        "new_balance": wallet.balance,
+                        "earnings": wallet.balance - wallet.deposit
+                    }
                     async_to_sync(channel_layer.group_send)(
                         f"user_{user.id}",  # Unique group for each user
                         {
                             "type": "send_balance_update",
-                            "new_balance": wallet.balance,
+                            "new_balance": balance_data,
                         }
                     )
                     investment.user.add(user)
@@ -305,11 +330,16 @@ class WebhookView(View):
                     referrer_wallet.balance += (float(payload['data']['amount'])*investment.interest*0.15)/100
                     referrer_wallet.save()
                     transaction = Transaction.objects.create(user=user.referred_by, amount=(float(payload['data']['amount'])*investment.interest*0.15)/100, status='completed', type='referal')
+                    # Send balance update to the WebSocket consumer
+                    balance_data ={
+                        "new_balance": referrer_wallet.balance,
+                        "earnings": referrer_wallet.balance - referrer_wallet.deposit
+                    }
                     async_to_sync(channel_layer.group_send)(
                         f"user_{user.referred_by.id}",
                         {
                             "type": "send_balance_update",
-                            "new_balance": referrer_wallet.balance,
+                            "new_balance": balance_data,
                         }
                     )
                     send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 85% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
@@ -354,18 +384,73 @@ class TransactionListView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
-class UserWalletView(APIView):
+class UserWalletView(generics.ListAPIView):
+    queryset = Wallet.objects.all()
+    serializer_class = WalletSerializer
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication, SessionAuthentication]
-    serializer_class = WalletSerializer
+    
+    def get_queryset(self):
+        return Wallet.objects.get(user=self.request.user)
+    
     def get(self, request, *args, **kwargs):
-        wallet = Wallet.objects.get(user=request.user)
-        data = {
-            "balance": wallet.balance,
-            "deposit": wallet.deposit
+        queryset = self.get_queryset()
+        serializer = WalletSerializer(queryset)
+        #Additional data which segments total balnce into 6 groups with increasing amounts
+        additional_data = {
+            "amount1": queryset.balance/6,
+            "amount2": queryset.balance/3,
+            "amount3": queryset.balance/2,
+            "amount4": queryset.balance/1.5,
+            "amount5": queryset.balance/1.2,
         }
+        data = serializer.data
+        data.update(additional_data)
         return Response(data, status=status.HTTP_200_OK)
 
+class IncreaseBalancePrediction(APIView):
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PredictionSerializer
+    def post(self, request, *args, **kwargs):
+        amount = request.data.get('amount')
+        type = request.data.get('type')
+        wallet = Wallet.objects.get(user=request.user)
+        if type == "increase":
+            wallet.balance += float(amount)
+            wallet.save()
+            # Send balance update to the WebSocket consumer
+            channel_layer = get_channel_layer()
+            balance_data ={
+                "new_balance": wallet.balance,
+                "earnings": wallet.balance - wallet.deposit
+            }
+            async_to_sync(channel_layer.group_send)(
+                f"user_{request.user.id}",  # Unique group for each user
+                {
+                    "type": "send_balance_update",
+                    "new_balance": balance_data,
+                }
+            )
+        elif type == "decrease":
+            wallet.balance -= float(amount)
+            wallet.save()
+            # Send balance update to the WebSocket consumer
+            channel_layer = get_channel_layer()
+            balance_data ={
+                "new_balance": wallet.balance,
+                "earnings": wallet.balance - wallet.deposit
+            }
+            async_to_sync(channel_layer.group_send)(
+                f"user_{request.user.id}",  # Unique group for each user
+                {
+                    "type": "send_balance_update",
+                    "new_balance": balance_data,
+                }
+            )
+        else:
+            return Response({"error": "Invalid type"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": "Balances increased successfully"}, status=status.HTTP_200_OK)
 #Worker APIS
 # worker to increase balance in all active wallets according to number of users created in that day.
 class IncreaseBalance(APIView):

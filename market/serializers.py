@@ -37,7 +37,8 @@ class WalletSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PredictionSerializer(serializers.Serializer):
-    prediction = serializers.CharField()
+    amount = serializers.CharField()
+    type = serializers.CharField()
 
 class CommentSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=False)

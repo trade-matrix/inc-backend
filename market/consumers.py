@@ -30,7 +30,7 @@ class BalanceConsumer(WebsocketConsumer):
     def send_balance_update(self, event):
         new_balance = event["new_balance"]
         self.send(text_data=json.dumps({
-            'new_balance': new_balance
+            'new_balance': new_balance,
         }))
     
     def send_user_verified(self, event):
