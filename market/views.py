@@ -23,9 +23,7 @@ from rest_framework.pagination import PageNumberPagination
 class InvestmentListView(generics.ListAPIView):
     queryset = Investment.objects.all()
     serializer_class = InvestmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [TokenAuthentication, SessionAuthentication]
-    
+    permission_classes = [permissions.AllowAny]
     def get_queryset(self):
         return Investment.objects.all()
     
