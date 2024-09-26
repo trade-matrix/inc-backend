@@ -225,7 +225,7 @@ class UserDetails(generics.GenericAPIView):
 class DeleteAccount(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [TokenAuthentication,SessionAuthentication]
-    def get(self, request, *args, **kwargs):
+    def delete(self, request, *args, **kwargs):
         user = request.user
         user.delete()
         return Response({"message": "Account deleted successfully"}, status=status.HTTP_200_OK)
