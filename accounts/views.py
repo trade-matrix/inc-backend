@@ -1,6 +1,6 @@
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from .serializers import UserLoginSerializer, UserRegistrationSerializer, UserOtpVerificationSerializer, UserResendOtpSerializer
+from .serializers import UserLoginSerializer, UserRegistrationSerializer, UserOtpVerificationSerializer, UserResendOtpSerializer, InvestmentSerializer
 from .models import Customer
 import os
 from rest_framework.authentication import TokenAuthentication,SessionAuthentication
@@ -188,10 +188,12 @@ class GetRefferedUsers(generics.GenericAPIView):
 class GetUserInvestments(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [TokenAuthentication,SessionAuthentication]
+    serializer_class = InvestmentSerializer
     def get(self, request, *args, **kwargs):
         user = request.user
         investments = Investment.objects.filter(user=user)
+        serializer = InvestmentSerializer(investments, many=True)
         data = {
-            "data": investments
+            "data": serializer.data
         }
         return Response(data, status=status.HTTP_200_OK)

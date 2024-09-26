@@ -5,7 +5,7 @@ import requests
 import os
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from market.models import Transaction
+from market.models import Transaction, Investment
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     referal_code = serializers.CharField(required=False)
@@ -75,11 +75,14 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 class UserLoginSerializer(serializers.Serializer):
     phone_number = serializers.CharField()
 
-
 class UserResendOtpSerializer(serializers.Serializer):
     user_id = serializers.CharField()
-
 
 class UserOtpVerificationSerializer(serializers.Serializer):
     code = serializers.CharField()
     user_id = serializers.CharField()
+
+class InvestmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Investment
+        fields = '__all__'
