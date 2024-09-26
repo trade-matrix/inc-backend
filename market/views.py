@@ -556,15 +556,14 @@ class GameView(APIView):
     def get(self, request, *args, **kwargs):
         game_name = request.data.get('name')
         game = Game.objects.get(user=request.user, name=game_name)
-        data = []
         if game.created_at + timedelta(hours=2) < datetime.now():
             game.active = False
         else:
             game.active = True
         
-        data.append({
+        data ={
             "name": game.name,
             "active": game.active,
             "created_at": game.created_at
-        })
+        }
         return Response(data, status=status.HTTP_200_OK)
