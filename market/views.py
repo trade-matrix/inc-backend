@@ -37,10 +37,10 @@ class UserInvest(APIView):
     authentication_classes = [TokenAuthentication, SessionAuthentication]
 
     def post(self, request, *args, **kwargs):
-        if not request.user.verified:
+        pk = request.data.get('id')
+        investment = Investment.objects.get(pk=pk)
+        if not request.user in investment.user.all():
             user = request.user
-            pk = request.data.get('id')
-            investment = Investment.objects.get(pk=pk)
             payment_response = paystack_payment(investment.amount, investment.title, user.username)
             if not payment_response:
                 return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
@@ -51,7 +51,7 @@ class UserInvest(APIView):
                 "payment_response": payment_response,
             }
             return Response(data, status=status.HTTP_200_OK)
-        return Response({"error": "User has Already Invested"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "User has Already Invested In this firm"}, status=status.HTTP_400_BAD_REQUEST)
 
 class VerifyPayment(APIView):
     permission_classes = [permissions.IsAuthenticated]
