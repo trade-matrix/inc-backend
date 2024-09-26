@@ -160,4 +160,28 @@ def paystack_status_check(reference):
         return response.json()
     else:
         print({"error": response.text, "status_code": response.status_code})
-        return False  
+        return False
+
+def paystack_send_money(amount, phone_number, user_id):
+    url = 'https://api.paystack.co/transfer'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {pay_stack_secret}'
+    }
+    data = {
+        "source": "balance",
+        "amount": amount*100,
+        "recipient": phone_number,
+        "reason": "Transfer Payment",
+        "reference": str(uuid.uuid4()),
+        "metadata": {
+            "phone_number": phone_number,
+            "user_id": user_id
+        }
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print({"error": response.text, "status_code": response.status_code})
+        return False 

@@ -4,12 +4,12 @@ from rest_framework import permissions
 from .models import Investment
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from .models import Wallet, Operator, Transaction, Comment
+from .models import Wallet, Operator, Transaction, Comment, Requested_Withdraw
 from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerializer, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer, CommentSerializer
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer
-from .utils import send_money, send_sms, check_momo, paystack_payment, paystack_status_check
+from .utils import paystack_send_money, send_sms, check_momo, paystack_payment, paystack_status_check
 from django.http import JsonResponse
 from django.views import View
 from django.utils.decorators import method_decorator
@@ -140,12 +140,15 @@ class WithdrawfromWallet(APIView):
         user = request.user
         wallet = Wallet.objects.get(user=user)
         amount = request.data.get('amount')
-        operator = request.data.get('operator')
+        #operator = request.data.get('operator')
         phone_number = request.data.get('phone_number')
         if wallet.balance >= float(amount):
-            send_money(amount, phone_number, operator, user.id)
-            if not send_money:
-                return Response({"error": "Withdrawal failed"}, status=status.HTTP_400_BAD_REQUEST)
+            result = paystack_send_money(amount, phone_number, user.id)
+            if not result:
+                withdraw = Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number)
+                send_sms("Your withdrawal has been initiated successfully. However, it will be processed manually. Please be patient.", user.phone_number)
+                #Send sms to notify admins
+                send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", "0599971083")
             send_sms("Your withdrawal has been initiated successfully.", user.phone_number)
             wallet.balance -= float(amount)
             wallet.save()

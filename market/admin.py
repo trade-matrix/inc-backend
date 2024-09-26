@@ -27,3 +27,9 @@ class CommentAdmin(admin.ModelAdmin):
     list_display = ['user', 'comment', 'name', 'created_at']
     search_fields = ['user', 'name']
 admin.site.register(Comment, CommentAdmin)
+
+class Requested_WithdrawAdmin(admin.ModelAdmin):
+    list_display = ['user', 'amount', 'phone_number', 'settled', 'created_at']
+    search_fields = ['user', 'phone_number']
+    list_filter = ['settled', 'created_at']
+admin.site.register(Requested_Withdraw, Requested_WithdrawAdmin)

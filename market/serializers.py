@@ -16,7 +16,7 @@ class ConfirmPayment(serializers.Serializer):
 class Withdraw(serializers.Serializer):
     amount = serializers.IntegerField()
     phone_number = serializers.CharField()
-    operator = serializers.CharField()
+    operator = serializers.CharField(required=False)
 
 class CheckMomoSerializer(serializers.Serializer):
     operator = serializers.CharField()
