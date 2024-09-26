@@ -360,7 +360,7 @@ class WebhookView(View):
                             'transaction': transaction_data
                         }
                     )
-                    
+
                     send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 85% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
                     send_sms(f"Congratulations! You just earned 15% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
                     return Response({"message": "Payment successful"}, status=200)
@@ -519,7 +519,7 @@ class CommentView(generics.ListCreateAPIView):
 
     
     def get_queryset(self):
-        return Comment.objects.all().order_by('-created_at')
+        return Comment.objects.all().order_by('-created_at')[:5]
     
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
