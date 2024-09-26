@@ -403,6 +403,7 @@ class UserWalletView(generics.ListAPIView):
             "amount3": queryset.balance/2,
             "amount4": queryset.balance/1.5,
             "amount5": queryset.balance/1.2,
+            "earnings": queryset.balance - queryset.deposit
         }
         data = serializer.data
         data.update(additional_data)
@@ -448,6 +449,7 @@ class IncreaseBalancePrediction(APIView):
                     "new_balance": balance_data,
                 }
             )
+            return Response({"message": "Balances decreased successfully"}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "Invalid type"}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"message": "Balances increased successfully"}, status=status.HTTP_200_OK)

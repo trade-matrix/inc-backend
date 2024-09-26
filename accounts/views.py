@@ -165,7 +165,7 @@ class UserCreateReferalLink(generics.GenericAPIView):
     authentication_classes = [TokenAuthentication,SessionAuthentication]
     def get(self, request, *args, **kwargs):
         user = request.user
-        referal_link = f"http://localhost:8000/accounts/register/?referral={user.username}"
+        referal_link = f"https://trade-matrix.vercel.app/auth/sign-up/?referral={user.username}"
         data = {
             "referal_link": referal_link,
             "message": "Referal link created successfully"
