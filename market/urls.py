@@ -15,4 +15,5 @@ urlpatterns = [
     path('remove-eligible/', RemoveWalletEligibility.as_view(), name='remove-eligible'),
     path('comment/', CommentView.as_view(), name='comment'),
     path('top-earners/', TopEarners.as_view(), name='top-earners'),
+    path('game/', GameView.as_view(), name='game'),
 ]

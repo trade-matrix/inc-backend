@@ -65,5 +65,16 @@ class Requested_Withdraw(models.Model):
     operator = models.ForeignKey(Operator, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     settled = models.BooleanField(default=False)
+    class Meta:
+        verbose_name = 'Requested Withdraw'
+        verbose_name_plural = 'Requested Withdraws'
     def __str__(self):
         return self.user.username
+    
+class Game(models.Model):
+    name = models.CharField(max_length=255)
+    user = models.ManyToManyField(Customer, related_name='players', blank=True)
+    active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=False)
+    def __str__(self):
+        return self.name

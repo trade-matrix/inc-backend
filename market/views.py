@@ -4,8 +4,8 @@ from rest_framework import permissions
 from .models import Investment
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from .models import Wallet, Operator, Transaction, Comment, Requested_Withdraw
-from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerializer, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer, CommentSerializer
+from .models import Wallet, Operator, Transaction, Comment, Requested_Withdraw, Game
+from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerializer, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer, CommentSerializer, GameSerializer
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer
@@ -16,7 +16,7 @@ from django.utils.decorators import method_decorator
 import json
 from django.views.decorators.csrf import csrf_exempt
 import datetime
-from datetime import datetime
+from datetime import datetime, timedelta
 #pagination
 from rest_framework.pagination import PageNumberPagination
 
@@ -530,3 +530,41 @@ class CommentView(generics.ListCreateAPIView):
             serializer.save(user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class GameView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    serializer_class = GameSerializer
+    def post(self, request, *args, **kwargs):
+        game_name = request.data.get('name')
+        try:
+            game = Game.objects.get(name=game_name, user=request.user)
+            game.created_at = datetime.now()
+        except Game.DoesNotExist:
+            game = Game.objects.create(name=game_name, user=request.user, active=True, created_at=datetime.now())
+        
+        game.save()
+
+        data = {
+            "message": "Game Created",
+            "timestamp": game.created_at,
+            "name": game.name,
+            "active": game.active
+        }
+        return Response(data, status=status.HTTP_200_OK)
+    
+    def get(self, request, *args, **kwargs):
+        game_name = request.data.get('name')
+        game = Game.objects.get(user=request.user, name=game_name)
+        data = []
+        if game.created_at + timedelta(hours=2) < datetime.now():
+            game.active = False
+        else:
+            game.active = True
+        
+        data.append({
+            "name": game.name,
+            "active": game.active,
+            "created_at": game.created_at
+        })
+        return Response(data, status=status.HTTP_200_OK)

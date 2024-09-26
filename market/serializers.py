@@ -52,3 +52,6 @@ class CommentSerializer(serializers.ModelSerializer):
         if not validated_data.get('created_at'):
             validated_data['created_at'] = datetime.datetime.now()
         return Comment.objects.create(**validated_data)
+
+class GameSerializer(serializers.Serializer):
+    name = serializers.IntegerField()
