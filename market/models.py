@@ -8,6 +8,8 @@ class Investment(models.Model):
     interest = models.FloatField()
     author = models.CharField(max_length=255, blank=True, null=True)
     status = models.BooleanField(default=True)
+    number = models.IntegerField(blank=True, null=True)
+    details = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to='investment', blank=True)
     created_at = models.DateTimeField(auto_now_add=False)
     def __str__(self):
