@@ -21,10 +21,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ub+e%4=2!&9t*jkcer0!)4ve(3&^&8$=%w7msfoi^dy628re5%'
+SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ["*"]
 
@@ -150,9 +150,9 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
 # Your B2 account credentials
-AWS_ACCESS_KEY_ID = '0050e63d27947900000000001'
-AWS_SECRET_ACCESS_KEY = 'K005ciejE154uGe9hIxKMLoQJx2CcLs'
-AWS_STORAGE_BUCKET_NAME = 'darkpass'
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME")
 AWS_S3_ENDPOINT_URL = 'https://s3.us-east-005.backblazeb2.com'
 
 # Set the region to match the B2 bucket region
