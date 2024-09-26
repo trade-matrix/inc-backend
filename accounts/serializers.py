@@ -50,7 +50,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 referal_user = Customer.objects.get(username=validated_data.get('referal_code'))
                 user.referred_by = referal_user
                 user.save()
-                transaction = Transaction.objects.create(user=referal_user, amount=0.00, status='pending', type='referal')
+                transaction = Transaction.objects.create(user=referal_user, amount=0.00, status='pending', type='referal', reffered=user.username)
                 # Send Transsaction to WebSocket
                 channel_layer = get_channel_layer()
                 transaction_data = {
@@ -59,6 +59,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                     'amount': transaction.amount,
                     'status': transaction.status,
                     'type': transaction.type,
+                    'reffered': transaction.reffered,
                     'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
                 }
                 async_to_sync(channel_layer.group_send)(
@@ -86,3 +87,8 @@ class InvestmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Investment
         fields = '__all__'
+
+class ReferredUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = ('id', 'status','reffered','created_at')

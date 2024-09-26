@@ -330,7 +330,7 @@ class WebhookView(View):
                     referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
                     referrer_wallet.balance += (float(payload['data']['amount'])*investment.interest*0.15)/100
                     referrer_wallet.save()
-                    transaction = Transaction.objects.create(user=user.referred_by, amount=(float(payload['data']['amount'])*investment.interest*0.15)/100, status='completed', type='referal')
+                    transaction = Transaction.objects.create(user=user.referred_by, amount=(float(payload['data']['amount'])*investment.interest*0.15)/100, status='completed', type='referal', reffered=user.username)
                     # Send balance update to the WebSocket consumer
                     balance_data ={
                         "new_balance": referrer_wallet.balance,
@@ -343,6 +343,24 @@ class WebhookView(View):
                             "new_balance": balance_data,
                         }
                     )
+                    #Send Transsaction to WebSocket
+                    transaction_data = {
+                        'id': transaction.id,
+                        'user': transaction.user,  # Assuming you're using the user's ID
+                        'amount': transaction.amount,
+                        'status': transaction.status,
+                        'type': transaction.type,
+                        'reffered': transaction.reffered,
+                        'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
+                    }
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{user.referred_by.id}",
+                        {
+                            'type': 'send_user_transaction',
+                            'transaction': transaction_data
+                        }
+                    )
+                    
                     send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 85% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings. You may withdraw your deposit within the next 24 hours. After this period, withdrawals will be paused until the target is reached.", user.phone_number)
                     send_sms(f"Congratulations! You just earned 15% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
                     return Response({"message": "Payment successful"}, status=200)

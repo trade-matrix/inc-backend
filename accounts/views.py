@@ -1,6 +1,6 @@
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from .serializers import UserLoginSerializer, UserRegistrationSerializer, UserOtpVerificationSerializer, UserResendOtpSerializer, InvestmentSerializer
+from .serializers import UserLoginSerializer, UserRegistrationSerializer, UserOtpVerificationSerializer, UserResendOtpSerializer, InvestmentSerializer, ReferredUserSerializer
 from .models import Customer
 import os
 from rest_framework.authentication import TokenAuthentication,SessionAuthentication
@@ -10,7 +10,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .exceptions import ExternalAPIError
 import requests
-from market.models import Wallet, Investment
+from market.models import Wallet, Investment, Transaction
 from .utils import send_otp
 
 class UserRegistrationView(generics.CreateAPIView):
@@ -177,11 +177,13 @@ class UserCreateReferalLink(generics.GenericAPIView):
 class GetRefferedUsers(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [TokenAuthentication,SessionAuthentication]
+    serializer_class = ReferredUserSerializer
     def get(self, request, *args, **kwargs):
         user = request.user
-        refered_users = Customer.objects.filter(referal=user)
+        referred_transactions = Transaction.objects.filter(user=user, type='referal')
+        serializer = ReferredUserSerializer(referred_transactions, many=True)
         data = {
-            "data": refered_users
+            "data": serializer.data
         }
         return Response(data, status=status.HTTP_200_OK)
 
