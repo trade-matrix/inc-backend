@@ -398,11 +398,11 @@ class UserWalletView(generics.ListAPIView):
         serializer = WalletSerializer(queryset)
         #Additional data which segments total balnce into 6 groups with increasing amounts
         additional_data = {
-            "amount1": queryset.balance/6,
-            "amount2": queryset.balance/3,
-            "amount3": queryset.balance/2,
-            "amount4": queryset.balance/1.5,
-            "amount5": queryset.balance/1.2,
+            "amount1": round(queryset.balance/6,2),
+            "amount2": round(queryset.balance/3,2),
+            "amount3": round(queryset.balance/2,2),
+            "amount4": round(queryset.balance/1.5,2),
+            "amount5": round(queryset.balance/1.2,2),
             "earnings": queryset.balance - queryset.deposit
         }
         data = serializer.data
