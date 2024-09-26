@@ -199,3 +199,33 @@ class GetUserInvestments(generics.GenericAPIView):
             "data": serializer.data
         }
         return Response(data, status=status.HTTP_200_OK)
+
+class UserDetails(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication,SessionAuthentication]
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        walet, _ = Wallet.objects.get_or_create(user=user)
+        earnings = walet.balance-walet.deposit
+        number_of_investments = Investment.objects.filter(user=user).count()
+        number_of_refferals = Transaction.objects.filter(user=user, type='referal').count()
+        eligibility = walet.eligible
+        data = {
+            "user_id": user.id,
+            "username": user.username,
+            "balance": walet.balance,
+            "earnings": earnings,
+            "deposit": walet.deposit,
+            "investments": number_of_investments,
+            "refferals": number_of_refferals,
+            "eligibility": eligibility
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+class DeleteAccount(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication,SessionAuthentication]
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        user.delete()
+        return Response({"message": "Account deleted successfully"}, status=status.HTTP_200_OK)
