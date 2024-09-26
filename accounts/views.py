@@ -154,6 +154,8 @@ class TotalNumberOfUsers(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         users = Customer.objects.all().count()
         user_percentage = (users/200000)*100
+        if user_percentage < 10:
+            user_percentage = 10
         data = {
             "total_users": users,
             "user_percentage": user_percentage
