@@ -13,7 +13,7 @@ def payment(amount, title, name):
     }
     data = {
         "amount": amount,
-        "redirect_url": "http://127.0.0.1:8000/accounts/login",
+        "redirect_url": "https://trade-matrix.net/admin/default/",
         "currency": "GHS",
         "reference": str(uuid.uuid4()),
         "narration": f"Payment for {title}",
@@ -28,7 +28,7 @@ def payment(amount, title, name):
             "investment": title,
             'username': name
         },
-        "notification_url": "http://127.0.0.1:8000/market/webhook/",
+        "notification_url": "https://api-dkqs.onrender.com/market/webhook/",
         "merchant_bears_cost": False
     }
 
