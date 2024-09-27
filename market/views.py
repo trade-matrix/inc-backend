@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer
-from .utils import paystack_send_money, send_sms, check_momo, paystack_payment, paystack_status_check
+from .utils import send_money, send_sms, check_momo, payment, status_check
 from django.http import JsonResponse
 from django.views import View
 from django.utils.decorators import method_decorator
@@ -41,7 +41,7 @@ class UserInvest(APIView):
         investment = Investment.objects.get(pk=pk)
         if not request.user in investment.user.all():
             user = request.user
-            payment_response = paystack_payment(investment.amount, investment.title, user.username)
+            payment_response = payment(investment.amount, investment.title, user.username)
             if not payment_response:
                 return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
             reference = payment_response['data']['reference']
@@ -60,7 +60,7 @@ class VerifyPayment(APIView):
     def get(self, request, *args, **kwargs):
         user = request.user
         reference = user.reference
-        status_chec = paystack_status_check(reference)
+        status_chec = status_check(reference)
         if status_chec['data']['status'] == 'success':
             user.verified = True
             user.save()
@@ -138,10 +138,10 @@ class WithdrawfromWallet(APIView):
         user = request.user
         wallet = Wallet.objects.get(user=user)
         amount = request.data.get('amount')
-        #operator = request.data.get('operator')
+        operator = request.data.get('operator')
         phone_number = request.data.get('phone_number')
         if wallet.balance >= float(amount):
-            result = paystack_send_money(amount, phone_number, user.id)
+            result = send_money(amount, phone_number, operator, user.id)
             if not result:
                 withdraw = Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number)
                 send_sms("Your withdrawal has been initiated successfully. However, it will be processed manually. Please be patient.", user.phone_number)
@@ -228,15 +228,15 @@ class WebhookView(View):
                     return JsonResponse({"error": "User has already invested"}, status=200)
                 # Update the wallet balance
                 if not user.referred_by:
-                    wallet.balance += ((float(payload['data']['amount'])*(investment.interest)) + float(payload['data']['amount']))/100
-                    wallet.deposit = float(payload['data']['amount'])/100  # For example, adding a deposit
+                    wallet.balance += ((float(payload['data']['amount'])*(investment.interest)) + float(payload['data']['amount']))
+                    wallet.deposit = float(payload['data']['amount'])  # For example, adding a deposit
                     # Update the wallet balance
                     wallet.active = True
                     wallet.eligible = True
                     wallet.date_made_eligible = datetime.now()
                     wallet.save()
                     # Create a transaction record
-                    transaction = Transaction.objects.create(user=user, amount=float(payload['data']['amount'])/100, status='completed', type='deposit')
+                    transaction = Transaction.objects.create(user=user, amount=float(payload['data']['amount']), status='completed', type='deposit')
                     # Serialize the transaction into JSON-serializable data
                     transaction_data = {
                         'id': transaction.id,
@@ -278,15 +278,15 @@ class WebhookView(View):
                         }
                     )
                 elif user.referred_by:
-                    wallet.balance += ((float(payload['data']['amount'])*(investment.interest)) + float(payload['data']['amount']))*0.85/100
-                    wallet.deposit = float(payload['data']['amount'])/100  # For example, adding a deposit
+                    wallet.balance += ((float(payload['data']['amount'])*(investment.interest)) + float(payload['data']['amount']))*0.85
+                    wallet.deposit = float(payload['data']['amount'])  # For example, adding a deposit
                     # Update the wallet balance
                     wallet.active = True
                     wallet.eligible = True
                     wallet.date_made_eligible = datetime.now()
                     wallet.save()
                     # Create a transaction record
-                    transaction = Transaction.objects.create(user=user, amount=float(payload['data']['amount'])/100, status='completed', type='deposit')
+                    transaction = Transaction.objects.create(user=user, amount=float(payload['data']['amount']), status='completed', type='deposit')
                     # Serialize the transaction into JSON-serializable data
                     transaction_data = {
                         'id': transaction.id,
@@ -328,9 +328,9 @@ class WebhookView(View):
                         }
                     )
                     referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
-                    referrer_wallet.balance += (float(payload['data']['amount'])*investment.interest*0.15)/100
+                    referrer_wallet.balance += (float(payload['data']['amount'])*investment.interest*0.15)
                     referrer_wallet.save()
-                    transaction = Transaction.objects.create(user=user.referred_by, amount=(float(payload['data']['amount'])*investment.interest*0.15)/100, status='completed', type='referal', reffered=user.username)
+                    transaction = Transaction.objects.create(user=user.referred_by, amount=(float(payload['data']['amount'])*investment.interest*0.15), status='completed', type='referal', reffered=user.username)
                     # Send balance update to the WebSocket consumer
                     balance_data ={
                         "new_balance": referrer_wallet.balance,
@@ -372,7 +372,6 @@ class WebhookView(View):
 
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON"}, status=400)
-# Create an instance of the view
 webhook_view = WebhookView.as_view()
 
 class CheckUserMomo(APIView):
