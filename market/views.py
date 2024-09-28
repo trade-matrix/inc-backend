@@ -539,6 +539,10 @@ class IncreaseBalancePrediction(APIView):
     def post(self, request, *args, **kwargs):
         amount = request.data.get('amount')
         type = request.data.get('type')
+        try:
+            score = request.data.get('score')
+        except:
+            pass
         wallet = Wallet.objects.get(user=request.user)
         if type == "increase":
             wallet.balance += float(amount)
@@ -575,6 +579,22 @@ class IncreaseBalancePrediction(APIView):
             return Response({"message": "Balances decreased successfully"}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "Invalid type"}, status=status.HTTP_400_BAD_REQUEST)
+        if score:
+            wallet.balance += float(score)/10
+            wallet.save()
+            # Send balance update to the WebSocket consumer
+            channel_layer = get_channel_layer()
+            balance_data ={
+                "new_balance": wallet.balance,
+                "earnings": wallet.balance - wallet.deposit
+            }
+            async_to_sync(channel_layer.group_send)(
+                f"user_{request.user.id}",  # Unique group for each user
+                {
+                    "type": "send_balance_update",
+                    "new_balance": balance_data,
+                }
+            )
         return Response({"message": "Balances increased successfully"}, status=status.HTTP_200_OK)
 #Worker APIS
 # worker to increase balance in all active wallets according to number of users created in that day.
