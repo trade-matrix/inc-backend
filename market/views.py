@@ -702,14 +702,14 @@ class GameView(APIView):
         now = timezone.now()  # Get the current time with timezone awareness
 
         if math_game.created_at:
-            if math_game.created_at + timedelta(seconds=60) < now:
+            if math_game.created_at + timedelta(hours=2) < now:
                 math_game.active = False
             else:
                 math_game.active = True
             math_game.save()
 
         if prediction_game.created_at:
-            if prediction_game.created_at + timedelta(seconds=60) < now:
+            if prediction_game.created_at + timedelta(hours=2) < now:
                 prediction_game.active = False
             else:
                 prediction_game.active = True
