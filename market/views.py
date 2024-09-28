@@ -254,9 +254,11 @@ class WebhookView(View):
 
             # Here you can handle the notification (e.g., update your database, etc.)
             if payload.get('event') == 'transfer.success':
-                phone_number = payload['metadata']['phone_number']
-                user_id = payload['metadata']['user_id']
-                investment = Investment.objects.get(title=payload['metadata']['investment'])
+                reference = payload['data']['reference']
+                user = Customer.objects.get(withdrawal_reference=reference)
+                phone_number = user.phone_number
+                user_id = user.pk
+                investments = Investment.objects.filter(user__id=user.id)
                 wallet = Wallet.objects.get(user=user_id)
                 wallet.active = False
                 wallet.balance = 0
@@ -265,7 +267,7 @@ class WebhookView(View):
                 # Send balance update to the WebSocket consumer
                 balance_data ={
                     "new_balance": wallet.balance,
-                    "earnings": wallet.balance - wallet.deposit
+                    "earnings": 0
                 }
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
@@ -275,12 +277,15 @@ class WebhookView(View):
                         "new_balance": balance_data,
                     }
                 )
-                investment.user.remove(user_id)
-                investment.save()
+                for investment in investments:
+                    investment.user.remove(user_id)
+                    investment.save()
                 send_sms("Your withdrawal was successful", phone_number)
-            elif payload.get('event') == 'transfer.failed':
-                phone_number = payload['metadata']['phone_number']
-                user_id = payload['metadata']['user_id']
+            else:
+                reference = payload['data']['reference']
+                user = Customer.objects.get(withdrawal_reference=reference)
+                user_id = user.pk
+                phone_number = user.phone_number
                 wallet = Wallet.objects.get(user=user_id)
                 wallet.balance += float(payload['data']['amount'])
                 wallet.save()
@@ -299,26 +304,27 @@ class WebhookView(View):
                     }
                 )
                 send_sms("Your withdrawal failed. Your balance has been reverted.", phone_number)   
-            elif payload.get('event') == 'charge.success':
+            if payload.get('event') == 'charge.success':
                 reference = payload['data']['reference']
                 user = Customer.objects.get(reference=reference)
                 user.verified = True
                 user.save()
-                investment = Investment.objects.get(title=payload['data']['metadata']['investment'])
+                amount = float(payload['data']['amount'])
+                investment = Investment.objects.get(amount=amount)
                 wallet,_ = Wallet.objects.get_or_create(user=user)
                 if wallet.active:
                     return JsonResponse({"error": "User has already invested"}, status=200)
                 # Update the wallet balance
                 if not user.referred_by:
-                    wallet.balance += ((float(payload['data']['amount'])*(investment.interest)) + float(payload['data']['amount']))
-                    wallet.deposit = float(payload['data']['amount'])  # For example, adding a deposit
+                    wallet.balance += (amount*(investment.interest)) + amount
+                    wallet.deposit += amount  # For example, adding a deposit
                     # Update the wallet balance
                     wallet.active = True
                     wallet.eligible = True
                     wallet.date_made_eligible = datetime.now()
                     wallet.save()
                     # Create a transaction record
-                    transaction = Transaction.objects.create(user=user, amount=float(payload['data']['amount']), status='completed', type='deposit')
+                    transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit')
                     # Serialize the transaction into JSON-serializable data
                     transaction_data = {
                         'id': transaction.id,
@@ -360,15 +366,15 @@ class WebhookView(View):
                         }
                     )
                 elif user.referred_by:
-                    wallet.balance += ((float(payload['data']['amount'])*(investment.interest)) + float(payload['data']['amount']))*0.85
-                    wallet.deposit = float(payload['data']['amount'])  # For example, adding a deposit
+                    wallet.balance += ((amount*(investment.interest)) + amount)*0.85
+                    wallet.deposit += amount  # For example, adding a deposit
                     # Update the wallet balance
                     wallet.active = True
                     wallet.eligible = True
                     wallet.date_made_eligible = datetime.now()
                     wallet.save()
                     # Create a transaction record
-                    transaction = Transaction.objects.create(user=user, amount=float(payload['data']['amount']), status='completed', type='deposit')
+                    transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit')
                     # Serialize the transaction into JSON-serializable data
                     transaction_data = {
                         'id': transaction.id,
@@ -410,9 +416,9 @@ class WebhookView(View):
                         }
                     )
                     referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
-                    referrer_wallet.balance += (float(payload['data']['amount'])*investment.interest*0.15)
+                    referrer_wallet.balance += (amount*investment.interest)*0.15
                     referrer_wallet.save()
-                    transaction = Transaction.objects.create(user=user.referred_by, amount=(float(payload['data']['amount'])*investment.interest*0.15), status='completed', type='referal', reffered=user.username)
+                    transaction = Transaction.objects.create(user=user.referred_by, amount=(amount*investment.interest)*0.15, status='completed', type='referal', reffered=user.username)
                     # Send balance update to the WebSocket consumer
                     balance_data ={
                         "new_balance": referrer_wallet.balance,

@@ -10,7 +10,4 @@ class Customer(AbstractUser):
     verified = models.BooleanField(default=False)
     reference = models.CharField(max_length=255, blank=True, null=True)
     referal_code = models.CharField(max_length=255, blank=True, null=True)
-    prediction = models.CharField(max_length=255, blank=True, null=True)
-    prediction_correct = models.BooleanField(default=False)
-    prediction_date = models.DateTimeField(blank=True, null=True)
-   
+    withdrawal_reference = models.CharField(max_length=255, blank=True, null=True)
