@@ -660,7 +660,10 @@ class GameView(APIView):
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     serializer_class = GameSerializer
     def post(self, request, *args, **kwargs):
-        game_name = request.data.get('name')
+        try:
+            game_name = request.data.get('name')
+        except:
+            return Response({"error": "Invalid game name"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             game = Game.objects.get(name=game_name, user=request.user)
             game.created_at = datetime.now()
