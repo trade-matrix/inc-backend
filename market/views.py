@@ -318,8 +318,6 @@ class WebhookView(View):
                 amount = float(payload['data']['amount'])-float(payload['data']['fee'])
                 investment = Investment.objects.get(amount=amount)
                 wallet,_ = Wallet.objects.get_or_create(user=user)
-                if wallet.active:
-                    return JsonResponse({"error": "User has already invested"}, status=200)
                 # Update the wallet balance
                 if not user.referred_by:
                     wallet.balance += (amount*(investment.interest)) + amount
