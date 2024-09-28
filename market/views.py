@@ -526,7 +526,7 @@ class UserWalletView(generics.ListAPIView):
             "amount3": round(queryset.balance/2,2),
             "amount4": round(queryset.balance/1.5,2),
             "amount5": round(queryset.balance/1.2,2),
-            "earnings": queryset.balance - queryset.deposit
+            "earnings": round(queryset.balance - queryset.deposit,2)
         }
         data = serializer.data
         data.update(additional_data)
