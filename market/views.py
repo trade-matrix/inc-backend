@@ -668,6 +668,7 @@ class GameView(APIView):
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     serializer_class = GameSerializer
     def post(self, request, *args, **kwargs):
+        wallet = Wallet.objects.get(user=request.user)
         try:
             game_name = request.data.get('name')
             if game_name == '':
@@ -680,6 +681,10 @@ class GameView(APIView):
                 return Response({"message": "Game already initiated today"}, status=status.HTTP_400_BAD_REQUEST)
             game.today = True
             game.created_at = datetime.now()
+            if wallet.balance < 10:
+                return Response({"message": "Insufficient funds to play game"}, status=status.HTTP_400_BAD_REQUEST)
+            elif wallet.deposit < 10:
+                return Response({"message": "Insufficient funds to play game"}, status=status.HTTP_400_BAD_REQUEST)
         except Game.DoesNotExist:
             game = Game.objects.create(name=game_name, user=request.user, active=True, today=True, created_at=datetime.now())
         
