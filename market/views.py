@@ -11,12 +11,12 @@ from rest_framework.response import Response
 from accounts.models import Customer
 from .utils import send_money, send_sms, check_momo, payment, status_check
 from django.http import JsonResponse
-from django.views import View
 from django.utils.decorators import method_decorator
 import json
 from django.views.decorators.csrf import csrf_exempt
 import datetime
 from datetime import datetime, timedelta
+from django.utils import timezone  # Use Django's timezone utility
 #pagination
 from rest_framework.pagination import PageNumberPagination
 
@@ -679,28 +679,36 @@ class GameView(APIView):
     
     def get(self, request, *args, **kwargs):
         user = request.user
-        math_game,_ = Game.objects.get_or_create(user=user,name='Math')
-        predicition_game,_ = Game.objects.get_or_create(user=user,name='Prediction')
+        math_game, _ = Game.objects.get_or_create(user=user, name='Math')
+        prediction_game, _ = Game.objects.get_or_create(user=user, name='Prediction')
+
+        # Compare timezone-aware datetime objects
+        now = timezone.now()  # Get the current time with timezone awareness
+
         if math_game.created_at:
-            if math_game.created_at + timedelta(hours=2) < datetime.now():
+            if math_game.created_at + timedelta(hours=2) < now:
                 math_game.active = False
             else:
                 math_game.active = True
             math_game.save()
-        elif predicition_game.created_at:
-            if predicition_game.created_at + timedelta(hours=2) < datetime.now():
-                predicition_game.active = False
+
+        if prediction_game.created_at:
+            if prediction_game.created_at + timedelta(hours=2) < now:
+                prediction_game.active = False
             else:
-                predicition_game.active = True
-       
-            predicition_game.save()
+                prediction_game.active = True
+            prediction_game.save()
+
+        # Prepare response data
         data = {
             "Math": math_game.active,
-            "Prediction": predicition_game.active   
+            "Prediction": prediction_game.active
         }
-        #Add timestamps to the data
+
+        # Add timestamps to the response
         if math_game.created_at:
             data['Math_timestamp'] = math_game.created_at
-        if predicition_game.created_at:
-            data['Prediction_timestamp'] = predicition_game.created_at
+        if prediction_game.created_at:
+            data['Prediction_timestamp'] = prediction_game.created_at
+
         return Response(data, status=status.HTTP_200_OK)
