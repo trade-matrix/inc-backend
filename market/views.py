@@ -315,7 +315,7 @@ class WebhookView(View):
                     user.save()
                 except Customer.DoesNotExist:
                     return Response({"error": "User not found"}, status=404)
-                amount = float(payload['data']['amount'])
+                amount = float(payload['data']['amount'])-float(payload['data']['fee'])
                 investment = Investment.objects.get(amount=amount)
                 wallet,_ = Wallet.objects.get_or_create(user=user)
                 if wallet.active:
