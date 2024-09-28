@@ -229,6 +229,18 @@ class WithdrawfromWallet(APIView):
             if not result:
                 Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number)
                 send_sms("Your withdrawal has been initiated successfully. However, it will be processed manually. Please be patient.", user.phone_number)
+                wallet.balance -= float(amount)
+                wallet.save()
+
+                # Send balance update to the WebSocket consumer
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{user.id}",  # Unique group for each user
+                    {
+                        "type": "send_balance_update",
+                        "new_balance": wallet.balance,
+                    }
+                )
                 #Send sms to notify admins
                 send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", "0599971083")
                 return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
