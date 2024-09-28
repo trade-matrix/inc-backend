@@ -33,3 +33,9 @@ class Requested_WithdrawAdmin(admin.ModelAdmin):
     search_fields = ['user', 'phone_number']
     list_filter = ['settled', 'created_at']
 admin.site.register(Requested_Withdraw, Requested_WithdrawAdmin)
+
+class GameAdmin(admin.ModelAdmin):
+    list_display = ['name',  'created_at']
+    search_fields = ['name', 'active']
+    list_filter = ['name', 'created_at']
+admin.site.register(Game, GameAdmin)

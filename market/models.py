@@ -75,6 +75,6 @@ class Game(models.Model):
     name = models.CharField(max_length=255)
     user = models.ManyToManyField(Customer, related_name='players', blank=True)
     active = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=False)
+    created_at = models.DateTimeField(auto_now_add=False, blank=True, null=True)
     def __str__(self):
         return self.name

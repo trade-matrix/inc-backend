@@ -678,16 +678,29 @@ class GameView(APIView):
         return Response(data, status=status.HTTP_200_OK)
     
     def get(self, request, *args, **kwargs):
-        game_name = request.data.get('name')
-        game = Game.objects.get(user=request.user, name=game_name)
-        if game.created_at + timedelta(hours=2) < datetime.now():
-            game.active = False
-        else:
-            game.active = True
-        
-        data ={
-            "name": game.name,
-            "active": game.active,
-            "created_at": game.created_at
+        user = request.user
+        math_game,_ = Game.objects.get_or_create(user=user,name='Math')
+        predicition_game,_ = Game.objects.get_or_create(user=user,name='Prediction')
+        if math_game.created_at:
+            if math_game.created_at + timedelta(hours=2) < datetime.now():
+                math_game.active = False
+            else:
+                math_game.active = True
+            math_game.save()
+        elif predicition_game.created_at:
+            if predicition_game.created_at + timedelta(hours=2) < datetime.now():
+                predicition_game.active = False
+            else:
+                predicition_game.active = True
+       
+            predicition_game.save()
+        data = {
+            "Math": math_game.active,
+            "Prediction": predicition_game.active   
         }
+        #Add timestamps to the data
+        if math_game.created_at:
+            data['Math_timestamp'] = math_game.created_at
+        if predicition_game.created_at:
+            data['Prediction_timestamp'] = predicition_game.created_at
         return Response(data, status=status.HTTP_200_OK)
