@@ -225,7 +225,7 @@ class WithdrawfromWallet(APIView):
         if wallet.balance >= float(amount):
             result = send_money(amount, phone_number, operator, user.id)
             if not result:
-                Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number)
+                Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
                 send_sms("Your withdrawal has been initiated successfully. However, it will be processed manually. Please be patient.", user.phone_number)
                 wallet.balance -= float(amount)
                 wallet.save()

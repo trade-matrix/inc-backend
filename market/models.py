@@ -62,7 +62,7 @@ class Requested_Withdraw(models.Model):
     user = models.ForeignKey(Customer, on_delete=models.CASCADE)
     amount = models.FloatField()
     phone_number = models.CharField(max_length=255)
-    operator = models.ForeignKey(Operator, on_delete=models.CASCADE)
+    operator = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     settled = models.BooleanField(default=False)
     class Meta:
