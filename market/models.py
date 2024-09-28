@@ -76,5 +76,6 @@ class Game(models.Model):
     user = models.ForeignKey(Customer, related_name='players', blank=True, on_delete=models.CASCADE)
     active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=False, blank=True, null=True)
+    today = models.BooleanField(default=False)
     def __str__(self):
         return self.name

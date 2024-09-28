@@ -620,6 +620,14 @@ class RemoveWalletEligibility(APIView):
             wallet.eligible = False
             wallet.save()
         return Response({"message": "Wallets made ineligible successfully"}, status=status.HTTP_200_OK)
+
+class SetGameTodayFalse(APIView):
+    def get(self, request, *args, **kwargs):
+        games = Game.objects.all()
+        for game in games:
+            game.today = False
+            game.save()
+        return Response({"message": "Games set to today=False successfully"}, status=status.HTTP_200_OK)
 #List Top Earners
 class TopEarners(APIView):
     def get(self, request, *args, **kwargs):
@@ -662,13 +670,17 @@ class GameView(APIView):
     def post(self, request, *args, **kwargs):
         try:
             game_name = request.data.get('name')
+            if game_name == '':
+                return Response({"message": "Game Name is Empty"}, status=status.HTTP_400_BAD_REQUEST)
         except:
-            return Response({"error": "Invalid game name"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Invalid game name"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             game = Game.objects.get(name=game_name, user=request.user)
+            if game.today:
+                return Response({"message": "Game already initiated today"}, status=status.HTTP_400_BAD_REQUEST)
             game.created_at = datetime.now()
         except Game.DoesNotExist:
-            game = Game.objects.create(name=game_name, user=request.user, active=True, created_at=datetime.now())
+            game = Game.objects.create(name=game_name, user=request.user, active=True, today=True, created_at=datetime.now())
         
         game.save()
 
