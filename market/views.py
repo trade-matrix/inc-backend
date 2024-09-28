@@ -231,6 +231,7 @@ class WithdrawfromWallet(APIView):
                 send_sms("Your withdrawal has been initiated successfully. However, it will be processed manually. Please be patient.", user.phone_number)
                 #Send sms to notify admins
                 send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", "0599971083")
+                return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
             send_sms("Your withdrawal has been initiated successfully.", user.phone_number)
             wallet.balance -= float(amount)
             wallet.save()
