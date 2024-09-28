@@ -283,7 +283,7 @@ class WebhookView(View):
                     investment.user.remove(user_id)
                     investment.save()
                 send_sms("Your withdrawal was successful", phone_number)
-            else:
+            elif payload.get('event') == 'transfer.failed':
                 reference = payload['data']['reference']
                 user = Customer.objects.get(withdrawal_reference=reference)
                 user_id = user.pk
@@ -306,7 +306,7 @@ class WebhookView(View):
                     }
                 )
                 send_sms("Your withdrawal failed. Your balance has been reverted.", phone_number)   
-            if payload.get('event') == 'charge.success':
+            elif payload.get('event') == 'charge.success':
                 reference = payload['data']['reference']
                 print(reference)
                 try:
