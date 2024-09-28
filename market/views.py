@@ -536,66 +536,66 @@ class IncreaseBalancePrediction(APIView):
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = PredictionSerializer
+    
     def post(self, request, *args, **kwargs):
         amount = request.data.get('amount')
         type = request.data.get('type')
+        score = request.data.get('score', None)
+        
+        if not amount or not type:
+            return Response({"error": "Amount and type are required"}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
-            score = request.data.get('score')
-        except:
-            pass
+            amount = float(amount)
+        except ValueError:
+            return Response({"error": "Invalid amount value"}, status=status.HTTP_400_BAD_REQUEST)
+        
         wallet = Wallet.objects.get(user=request.user)
+        
+        # Handle the score logic
+        if score:
+            try:
+                score_value = float(score) / 10
+                wallet.balance += score_value
+                wallet.save()
+                self.send_balance_update(wallet, request.user)
+                return Response({"message": "Balances increased with score successfully"}, status=status.HTTP_200_OK)
+            except ValueError:
+                return Response({"error": "Invalid score value"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Handle increase or decrease of balance
         if type == "increase":
-            wallet.balance += float(amount)
-            wallet.save()
-            # Send balance update to the WebSocket consumer
-            channel_layer = get_channel_layer()
-            balance_data ={
-                "new_balance": wallet.balance,
-                "earnings": wallet.balance - wallet.deposit
-            }
-            async_to_sync(channel_layer.group_send)(
-                f"user_{request.user.id}",  # Unique group for each user
-                {
-                    "type": "send_balance_update",
-                    "new_balance": balance_data,
-                }
-            )
+            wallet.balance += amount
+            message = f"You Won GHS {amount}"
         elif type == "decrease":
-            wallet.balance -= float(amount)
-            wallet.save()
-            # Send balance update to the WebSocket consumer
-            channel_layer = get_channel_layer()
-            balance_data ={
-                "new_balance": wallet.balance,
-                "earnings": wallet.balance - wallet.deposit
-            }
-            async_to_sync(channel_layer.group_send)(
-                f"user_{request.user.id}",  # Unique group for each user
-                {
-                    "type": "send_balance_update",
-                    "new_balance": balance_data,
-                }
-            )
-            return Response({"message": "Balances decreased successfully"}, status=status.HTTP_200_OK)
+            wallet.balance -= amount
+            message = "Bet Placed Successfully"
         else:
             return Response({"error": "Invalid type"}, status=status.HTTP_400_BAD_REQUEST)
-        if score:
-            wallet.balance += float(score)/10
-            wallet.save()
-            # Send balance update to the WebSocket consumer
-            channel_layer = get_channel_layer()
-            balance_data ={
-                "new_balance": wallet.balance,
-                "earnings": wallet.balance - wallet.deposit
+        
+        wallet.save()
+        self.send_balance_update(wallet, request.user)
+
+        data = {
+            "message": message,
+            "new_balance": wallet.balance
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+    def send_balance_update(self, wallet, user):
+        """Send the balance update via WebSocket."""
+        channel_layer = get_channel_layer()
+        balance_data = {
+            "new_balance": wallet.balance,
+            "earnings": wallet.balance - wallet.deposit
+        }
+        async_to_sync(channel_layer.group_send)(
+            f"user_{user.id}",
+            {
+                "type": "send_balance_update",
+                "new_balance": balance_data,
             }
-            async_to_sync(channel_layer.group_send)(
-                f"user_{request.user.id}",  # Unique group for each user
-                {
-                    "type": "send_balance_update",
-                    "new_balance": balance_data,
-                }
-            )
-        return Response({"message": "Balances increased successfully"}, status=status.HTTP_200_OK)
+        )
 #Worker APIS
 # worker to increase balance in all active wallets according to number of users created in that day.
 class IncreaseBalance(APIView):
