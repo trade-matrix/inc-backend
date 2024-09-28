@@ -667,28 +667,29 @@ class GameView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     serializer_class = GameSerializer
+
     def post(self, request, *args, **kwargs):
         wallet = Wallet.objects.get(user=request.user)
-        try:
-            game_name = request.data.get('name')
-            if game_name == '':
-                return Response({"message": "Game Name is Empty"}, status=status.HTTP_400_BAD_REQUEST)
-        except:
-            return Response({"message": "Invalid game name"}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            game = Game.objects.get(name=game_name, user=request.user)
+        game_name = request.data.get('name')
+
+        if not game_name:
+            return Response({"message": "Game Name is Empty"}, status=status.HTTP_400_BAD_REQUEST)
+
+        game, created = Game.objects.get_or_create(
+            name=game_name, user=request.user,
+            defaults={'active': True, 'today': True, 'created_at': timezone.now()}
+        )
+
+        if not created:
             if game.today:
                 return Response({"message": "Game already initiated today"}, status=status.HTTP_400_BAD_REQUEST)
+            if wallet.balance < 10 or wallet.deposit < 10:
+                return Response({"message": "Insufficient funds to play game"}, status=status.HTTP_400_BAD_REQUEST)
+            
             game.today = True
-            game.created_at = datetime.now()
-            if wallet.balance < 10:
-                return Response({"message": "Insufficient funds to play game"}, status=status.HTTP_400_BAD_REQUEST)
-            elif wallet.deposit < 10:
-                return Response({"message": "Insufficient funds to play game"}, status=status.HTTP_400_BAD_REQUEST)
-        except Game.DoesNotExist:
-            game = Game.objects.create(name=game_name, user=request.user, active=True, today=True, created_at=datetime.now())
-        
-        game.save()
+            game.created_at = timezone.now()
+            game.active = True
+            game.save()
 
         data = {
             "message": "Game Created",
@@ -697,35 +698,22 @@ class GameView(APIView):
             "active": game.active
         }
         return Response(data, status=status.HTTP_200_OK)
-    
+
     def get(self, request, *args, **kwargs):
         user = request.user
-        math_game, _ = Game.objects.get_or_create(user=user, name='Math')
-        prediction_game, _ = Game.objects.get_or_create(user=user, name='Prediction')
+        now = timezone.now()  # Get current time with timezone awareness
 
-        # Compare timezone-aware datetime objects
-        now = timezone.now()  # Get the current time with timezone awareness
+        games = Game.objects.filter(user=user, name__in=['Math', 'Prediction'])
+        game_status = {}
 
-        if math_game.created_at:
-            if math_game.created_at + timedelta(hours=2) < now:
-                math_game.active = False
-            math_game.save()
+        for game in games:
+            if game.created_at and game.created_at + timedelta(hours=2) < now:
+                game.active = False
+                game.save()
 
-        if prediction_game.created_at:
-            if prediction_game.created_at + timedelta(hours=2) < now:
-                prediction_game.active = False
-            prediction_game.save()
+            game_status[game.name] = {
+                "active": game.active,
+                "timestamp": game.created_at
+            }
 
-        # Prepare response data
-        data = {
-            "Math": math_game.active,
-            "Prediction": prediction_game.active
-        }
-
-        # Add timestamps to the response
-        if math_game.created_at:
-            data['Math_timestamp'] = math_game.created_at
-        if prediction_game.created_at:
-            data['Prediction_timestamp'] = prediction_game.created_at
-
-        return Response(data, status=status.HTTP_200_OK)
+        return Response(game_status, status=status.HTTP_200_OK)
