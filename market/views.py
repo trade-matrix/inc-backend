@@ -314,7 +314,7 @@ class WebhookView(View):
                     user.verified = True
                     user.save()
                 except Customer.DoesNotExist:
-                    return JsonResponse({"error": "User not found"}, status=404)
+                    return Response({"error": "User not found"}, status=404)
                 amount = float(payload['data']['amount'])
                 investment = Investment.objects.get(amount=amount)
                 wallet,_ = Wallet.objects.get_or_create(user=user)
