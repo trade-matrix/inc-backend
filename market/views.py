@@ -678,6 +678,7 @@ class GameView(APIView):
             game = Game.objects.get(name=game_name, user=request.user)
             if game.today:
                 return Response({"message": "Game already initiated today"}, status=status.HTTP_400_BAD_REQUEST)
+            game.today = True
             game.created_at = datetime.now()
         except Game.DoesNotExist:
             game = Game.objects.create(name=game_name, user=request.user, active=True, today=True, created_at=datetime.now())
