@@ -58,7 +58,7 @@ class VerifyPayment(APIView):
     authentication_classes = [TokenAuthentication, SessionAuthentication]
 
     def get(self, request, *args, **kwargs):
-                reference = ['data']['reference']
+                reference = request.user.reference
                 user = Customer.objects.get(reference=reference)
                 user.verified = True
                 user.save()
@@ -224,7 +224,7 @@ class WithdrawfromWallet(APIView):
         phone_number = request.data.get('phone_number')
         if wallet.balance >= float(amount):
             result = send_money(amount, phone_number, operator, user.id)
-            user.withdrawal_reference = result['data']['reference']
+            user.withdrawal_reference = result.get('data').get('reference')
             user.save()
             if not result:
                 Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number)
@@ -248,7 +248,7 @@ class WithdrawfromWallet(APIView):
         return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
-class WebhookView(View):
+class WebhookView(APIView):
     def post(self, request, *args, **kwargs):
         try:
             # Parse the JSON body
@@ -471,7 +471,7 @@ class CheckUserMomo(APIView):
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     serializer_class = CheckMomoSerializer
     def post(self, request, *args, **kwargs):
-        phone_number = request.user.phone_number
+        phone_number = request.data.get('phone_number')
         operator = request.data.get('operator')
         operator_code = Operator.objects.get(name=operator).code
         check = check_momo(phone_number, operator_code)

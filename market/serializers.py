@@ -19,6 +19,7 @@ class Withdraw(serializers.Serializer):
     operator = serializers.CharField(required=False)
 
 class CheckMomoSerializer(serializers.Serializer):
+    phone_number = serializers.CharField()
     operator = serializers.CharField()
 
 class OperatorSerializer(serializers.ModelSerializer):
