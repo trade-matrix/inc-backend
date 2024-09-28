@@ -704,15 +704,11 @@ class GameView(APIView):
         if math_game.created_at:
             if math_game.created_at + timedelta(hours=2) < now:
                 math_game.active = False
-            else:
-                math_game.active = True
             math_game.save()
 
         if prediction_game.created_at:
             if prediction_game.created_at + timedelta(hours=2) < now:
                 prediction_game.active = False
-            else:
-                prediction_game.active = True
             prediction_game.save()
 
         # Prepare response data
