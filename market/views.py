@@ -538,50 +538,61 @@ class IncreaseBalancePrediction(APIView):
     serializer_class = PredictionSerializer
     
     def post(self, request, *args, **kwargs):
-        amount = request.data.get('amount', None)
-        type = request.data.get('type', None)
-        score = request.data.get('score', None)
+        amount = self.get_float_value(request.data.get('amount'), "amount")
+        score = self.get_float_value(request.data.get('score'), "score")
+        winnings = self.get_float_value(request.data.get('winnings'), "winnings")
+        bet_type = request.data.get('type', None)
         
-        if amount:
-            try:
-                amount = float(amount)
-            except ValueError:
-                return Response({"error": "Invalid amount value"}, status=status.HTTP_400_BAD_REQUEST)
-        
+        if isinstance(amount, Response): return amount  # Error if amount was invalid
+        if isinstance(score, Response): return score    # Error if score was invalid
+        if isinstance(winnings, Response): return winnings  # Error if winnings were invalid
+
         wallet = Wallet.objects.get(user=request.user)
-        
-        # Handle the score logic
-        if score:
-            try:
-                score_value = float(score) / 10
-                wallet.balance += score_value
-                wallet.save()
-                self.send_balance_update(wallet, request.user)
-                return Response({"message": "Balances increased with score successfully"}, status=status.HTTP_200_OK)
-            except ValueError:
-                return Response({"error": "Invalid score value"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Handle increase or decrease of balance
-        if type and amount:
-            if type == "increase":
-                wallet.balance += amount
-                message = f"You Won GHS {amount}"
-            elif type == "decrease":
-                wallet.balance -= amount
-                message = "Bet Placed Successfully"
-            else:
-                return Response({"error": "Invalid type"}, status=status.HTTP_400_BAD_REQUEST)
-        
-            wallet.save()
-            self.send_balance_update(wallet, request.user)
 
-            data = {
-                "message": message,
-                "new_balance": wallet.balance
-            }
-            return Response(data, status=status.HTTP_200_OK)
+        # Handle score logic
+        if score is not None:
+            self.update_balance(wallet, score / 10)
+            return self.success_response(wallet, "Balances increased with score successfully")
+        
+        # Handle increase or decrease of balance based on bet type
+        if bet_type == "decrease" and amount is not None:
+            self.update_balance(wallet, -amount)
+            message = "Bet Placed Successfully"
+            return self.success_response(wallet, message)
+            # If winnings are present, increase the balance by the winnings amount
+        elif winnings is not None and bet_type == "increase":
+            self.update_balance(wallet, winnings)
+            message = "Bet Won Successfully"
+            
+            return self.success_response(wallet, message)
+        
+        # Return error if type is not 'decrease' or amount is missing
+        return Response({"error": "Invalid type or missing amount"}, status=status.HTTP_400_BAD_REQUEST)
 
-    def send_balance_update(self, wallet, user):
+    def get_float_value(self, value, field_name):
+        """Helper method to convert a string value to a float. Returns a Response if conversion fails."""
+        if value is None:
+            return None  # It's okay if the value is not provided
+        try:
+            return float(value)
+        except ValueError:
+            return Response({"error": f"Invalid {field_name} value"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def update_balance(self, wallet, amount):
+        """Update the wallet balance and send WebSocket notification."""
+        wallet.balance += amount
+        wallet.save()
+        self.send_balance_update(wallet)
+    
+    def success_response(self, wallet, message):
+        """Return a success response after balance update."""
+        self.send_balance_update(wallet)
+        return Response({
+            "message": message,
+            "new_balance": wallet.balance
+        }, status=status.HTTP_200_OK)
+
+    def send_balance_update(self, wallet):
         """Send the balance update via WebSocket."""
         channel_layer = get_channel_layer()
         balance_data = {
@@ -589,12 +600,13 @@ class IncreaseBalancePrediction(APIView):
             "earnings": wallet.balance - wallet.deposit
         }
         async_to_sync(channel_layer.group_send)(
-            f"user_{user.id}",
+            f"user_{wallet.user.id}",
             {
                 "type": "send_balance_update",
                 "new_balance": balance_data,
             }
         )
+
 #Worker APIS
 # worker to increase balance in all active wallets according to number of users created in that day.
 class IncreaseBalance(APIView):

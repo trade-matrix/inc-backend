@@ -41,6 +41,7 @@ class PredictionSerializer(serializers.Serializer):
     amount = serializers.CharField(required=False)
     type = serializers.CharField(required=False)
     score = serializers.CharField(required=False)
+    winnings = serializers.CharField(required=False)
 
 class CommentSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=False)
