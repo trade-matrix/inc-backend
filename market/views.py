@@ -506,7 +506,7 @@ class TransactionListView(generics.ListAPIView):
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     
     def get_queryset(self):
-        return Transaction.objects.filter(user=self.request.user).order_by('-created_at')[:10]
+        return Transaction.objects.filter(user=self.request.user).order_by('-created_at')[:7]
     
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
