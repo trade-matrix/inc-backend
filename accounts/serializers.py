@@ -8,7 +8,7 @@ from asgiref.sync import async_to_sync
 from market.models import Transaction, Investment
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    referal_code = serializers.CharField(required=False)
+    referal_code = serializers.CharField(required=False, allow_blank=True)
     class Meta:
         model = Customer
         fields = ('username', 'phone_number','referal_code')
