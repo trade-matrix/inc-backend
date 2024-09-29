@@ -182,7 +182,7 @@ class GetRefferedUsers(generics.GenericAPIView):
     serializer_class = ReferredUserSerializer
     def get(self, request, *args, **kwargs):
         user = request.user
-        referred_transactions = Transaction.objects.filter(user=user, type='referal')
+        referred_transactions = Transaction.objects.filter(user=user, type='referal', status='completed')
         serializer = ReferredUserSerializer(referred_transactions, many=True)
         data = {
             "data": serializer.data
@@ -243,7 +243,7 @@ class NumberofReferralsRequired(generics.GenericAPIView):
             return Response({"error": "Wallet not found"}, status=status.HTTP_404_NOT_FOUND)
 
         earnings = wallet.balance - wallet.deposit
-        num_referrals = Transaction.objects.filter(user=request.user, type='referral', status='completed').count()
+        num_referrals = Transaction.objects.filter(user=request.user, type='referal', status='completed').count()
 
         # Calculate required referrals based on earnings
         required_referrals = round(earnings / 10,2)
