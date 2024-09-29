@@ -182,7 +182,7 @@ class GetRefferedUsers(generics.GenericAPIView):
     serializer_class = ReferredUserSerializer
     def get(self, request, *args, **kwargs):
         user = request.user
-        referred_transactions = Transaction.objects.filter(user=user, type='referal', status='completed')
+        referred_transactions = Transaction.objects.filter(user=user, type='referal')
         serializer = ReferredUserSerializer(referred_transactions, many=True)
         data = {
             "data": serializer.data
@@ -210,7 +210,7 @@ class UserDetails(generics.GenericAPIView):
         walet, _ = Wallet.objects.get_or_create(user=user)
         earnings = walet.balance-walet.deposit
         number_of_investments = Investment.objects.filter(user=user).count()
-        number_of_refferals = Transaction.objects.filter(user=user, type='referal').count()
+        number_of_refferals = Transaction.objects.filter(user=user, type='referal',status='completed').count()
         eligibility = walet.eligible
         data = {
             "user_id": user.id,
