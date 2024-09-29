@@ -13,4 +13,5 @@ urlpatterns = [
     path('investments/', GetUserInvestments.as_view(), name='investments'),
     path('details/', UserDetails.as_view(), name='details'),
     path('delete/', DeleteAccount.as_view(), name='delete'),
+    path('check-referal/', NumberofReferralsRequired.as_view(), name='check-referal'),
 ]

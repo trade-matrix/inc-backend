@@ -156,6 +156,8 @@ class TotalNumberOfUsers(generics.GenericAPIView):
         user_percentage = (users/200000)*100
         if user_percentage < 10:
             user_percentage = 10
+        elif user_percentage > 100:
+            user_percentage = 100
         data = {
             "total_users": users,
             "user_percentage": user_percentage
@@ -229,3 +231,35 @@ class DeleteAccount(generics.GenericAPIView):
         user = request.user
         user.delete()
         return Response({"message": "Account deleted successfully"}, status=status.HTTP_200_OK)
+
+class NumberofReferralsRequired(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            wallet = Wallet.objects.get(user=request.user)
+        except Wallet.DoesNotExist:
+            return Response({"error": "Wallet not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        earnings = wallet.balance - wallet.deposit
+        num_referrals = Transaction.objects.filter(user=request.user, type='referral').count()
+
+        # Calculate required referrals based on earnings
+        required_referrals = min(earnings / 10, 5)
+
+        # Avoid division by zero when calculating the percentage
+        if required_referrals > 0:
+            percentage = (num_referrals / required_referrals) * 100
+        else:
+            percentage = 100  # Default to 100% if no referrals are required
+
+        # Cap the percentage at 100
+        percentage = min(percentage, 100)
+
+        data = {
+            "required_referrals": required_referrals,
+            "number_of_referrals": num_referrals,
+            "percentage": percentage
+        }
+        return Response(data, status=status.HTTP_200_OK)
