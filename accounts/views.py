@@ -243,7 +243,7 @@ class NumberofReferralsRequired(generics.GenericAPIView):
             return Response({"error": "Wallet not found"}, status=status.HTTP_404_NOT_FOUND)
 
         earnings = wallet.balance - wallet.deposit
-        num_referrals = Transaction.objects.filter(user=request.user, type='referral').count()
+        num_referrals = Transaction.objects.filter(user=request.user, type='referral', status='completed').count()
 
         # Calculate required referrals based on earnings
         required_referrals = min(earnings / 10, 5)
@@ -262,4 +262,8 @@ class NumberofReferralsRequired(generics.GenericAPIView):
             "number_of_referrals": num_referrals,
             "percentage": percentage
         }
+        if percentage == 100:
+            data["eligible"] = True
+        else:
+            data["eligible"] = False
         return Response(data, status=status.HTTP_200_OK)
