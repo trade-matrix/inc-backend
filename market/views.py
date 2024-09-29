@@ -222,12 +222,13 @@ class WithdrawfromWallet(APIView):
         amount = request.data.get('amount')
         operator = request.data.get('operator')
         phone_number = request.data.get('phone_number')
-        if wallet.balance >= float(amount):
+        if wallet.deposit >= float(amount):
             result = send_money(amount, phone_number, operator, user.id)
             if not result:
                 Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
                 send_sms("Your withdrawal has been initiated successfully. However, it will be processed manually. Please be patient.", user.phone_number)
                 wallet.balance -= float(amount)
+                wallet.eligible = False
                 wallet.save()
 
                 # Send balance update to the WebSocket consumer
@@ -502,7 +503,7 @@ class TransactionListView(generics.ListAPIView):
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     
     def get_queryset(self):
-        return Transaction.objects.filter(user=self.request.user)
+        return Transaction.objects.filter(user=self.request.user).order_by('-created_at')[:10]
     
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
@@ -698,7 +699,8 @@ class GameView(APIView):
                 return Response({"message": "Game already initiated today"}, status=status.HTTP_400_BAD_REQUEST)
             if wallet.balance < 10 or wallet.deposit < 10:
                 return Response({"message": "Insufficient funds to play game"}, status=status.HTTP_400_BAD_REQUEST)
-            
+            if not wallet.eligible:
+                return Response({"message": "Wallet not eligible to play game"}, status=status.HTTP_400_BAD_REQUEST)
             game.today = True
             game.created_at = timezone.now()
             game.active = True

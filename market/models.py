@@ -10,7 +10,7 @@ class Investment(models.Model):
     status = models.BooleanField(default=True)
     number = models.IntegerField(blank=True, null=True)
     details = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to='investment', blank=True)
+    image = models.ImageField(blank=True, null=True, upload_to='investment/')
     created_at = models.DateTimeField(auto_now_add=False)
     def __str__(self):
         return self.title
