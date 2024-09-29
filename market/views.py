@@ -692,17 +692,9 @@ class GameView(APIView):
         if not game_name:
             return Response({"message": "Game Name is Empty"}, status=status.HTTP_400_BAD_REQUEST)
 
-        game, created = Game.objects.get_or_create(
+        game,_ = Game.objects.get_or_create(
             name=game_name, user=request.user,
-            defaults={'active': True, 'today': True, 'created_at': timezone.now()}
         )
-
-        if not created:
-            game.today = True
-            game.created_at = timezone.now()
-            game.active = True
-            game.save()
-
         if game.today:
             return Response({"message": "Game already initiated today"}, status=status.HTTP_400_BAD_REQUEST)
         if wallet.balance < 10:
@@ -711,6 +703,10 @@ class GameView(APIView):
             return Response({"message": "Insufficient deposit to play game"}, status=status.HTTP_400_BAD_REQUEST)
         if not wallet.eligible:
             return Response({"message": "Wallet not eligible to play game"}, status=status.HTTP_400_BAD_REQUEST)
+        game.today = True
+        game.created_at = timezone.now()
+        game.active = True
+        game.save()
         data = {
             "message": "Game Created",
             "timestamp": game.created_at,
