@@ -556,6 +556,8 @@ class IncreaseBalancePrediction(APIView):
         
         # Handle increase or decrease of balance based on bet type
         if bet_type == "decrease" and amount is not None:
+            if wallet.balance < amount:
+                return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
             self.update_balance(wallet, -amount)
             message = "Bet Placed Successfully"
             return self.success_response(wallet, message)
