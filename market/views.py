@@ -241,6 +241,8 @@ class WithdrawfromWallet(APIView):
                     }
                 )
                 #Send sms to notify admins
+                ref = user.username+str(datetime.now())
+                Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
                 send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", "0599971083")
                 return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
             send_sms("Your withdrawal has been initiated successfully.", user.phone_number)
@@ -258,6 +260,8 @@ class WithdrawfromWallet(APIView):
                     "new_balance": wallet.balance,
                 }
             )
+            #Create a transaction record
+            Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
             return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
         return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -297,6 +301,10 @@ class WebhookView(APIView):
                     investment.user.remove(user_id)
                     investment.save()
                 send_sms("Your withdrawal was successful", phone_number)
+                #Update Transaction
+                transaction = Transaction.objects.filter(user=user, status='pending', type='withdrawal',amount=float(payload['data']['amount'])-float(payload['data']['fee'])).first()
+                transaction.status = 'completed'
+                transaction.save()
             elif payload.get('event') == 'transfer.failed':
                 reference = payload['data']['reference']
                 user = Customer.objects.get(withdrawal_reference=reference)
@@ -342,7 +350,7 @@ class WebhookView(APIView):
                     wallet.date_made_eligible = datetime.now()
                     wallet.save()
                     # Create a transaction record
-                    transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit')
+                    transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
                     # Serialize the transaction into JSON-serializable data
                     transaction_data = {
                         'id': transaction.id,
@@ -392,7 +400,7 @@ class WebhookView(APIView):
                     wallet.date_made_eligible = datetime.now()
                     wallet.save()
                     # Create a transaction record
-                    transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit')
+                    transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
                     # Serialize the transaction into JSON-serializable data
                     transaction_data = {
                         'id': transaction.id,

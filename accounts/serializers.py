@@ -50,7 +50,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 referal_user = Customer.objects.get(username=validated_data.get('referal_code'))
                 user.referred_by = referal_user
                 user.save()
-                transaction = Transaction.objects.create(user=referal_user, amount=0.00, status='pending', type='referal', reffered=user.username)
+                transaction = Transaction.objects.create(user=referal_user, amount=0.00, status='pending', type='referal', reffered=user.username, image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/male.png')
                 # Send Transsaction to WebSocket
                 channel_layer = get_channel_layer()
                 transaction_data = {
