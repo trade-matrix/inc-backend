@@ -719,19 +719,24 @@ class GameView(APIView):
         user = request.user
         now = timezone.now()  # Get current time with timezone awareness
 
+        # Filter the games belonging to the user and the specific names
         games = Game.objects.filter(user=user, name__in=['Math', 'Prediction'])
         game_status = {}
 
         for game in games:
+            # Set game inactive if it's been created more than 2 hours ago
             if game.created_at and game.created_at + timedelta(hours=2) < now:
                 game.active = False
                 game.save()
 
+            # Build the game status dictionary
             game_status[game.name] = {
                 "active": game.active,
                 "timestamp": game.created_at
             }
+
+            # Remove the timestamp if the game is not active
             if not game.active:
-                game_status.pop("timestamp", None)
+                game_status[game.name].pop("timestamp", None)
 
         return Response(game_status, status=status.HTTP_200_OK)
