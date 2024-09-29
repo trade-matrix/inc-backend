@@ -57,4 +57,4 @@ class CommentSerializer(serializers.ModelSerializer):
         return Comment.objects.create(**validated_data)
 
 class GameSerializer(serializers.Serializer):
-    name = serializers.IntegerField()
+    name = serializers.CharField()
