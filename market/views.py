@@ -731,5 +731,7 @@ class GameView(APIView):
                 "active": game.active,
                 "timestamp": game.created_at
             }
+            if not game.active:
+                game_status.pop("timestamp", None)
 
         return Response(game_status, status=status.HTTP_200_OK)
