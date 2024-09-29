@@ -246,7 +246,9 @@ class NumberofReferralsRequired(generics.GenericAPIView):
         num_referrals = Transaction.objects.filter(user=request.user, type='referral', status='completed').count()
 
         # Calculate required referrals based on earnings
-        required_referrals = min(earnings / 10, 5)
+        required_referrals = round(earnings / 10,2)
+        if required_referrals < 10:
+            required_referrals = 10
 
         # Avoid division by zero when calculating the percentage
         if required_referrals > 0:
