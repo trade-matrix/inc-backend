@@ -1,8 +1,9 @@
 import requests
-import time
 
-while True:
-    url = 'https://api-dkqs.onrender.com'
-    response = requests.get(url)
-    print(response.json())
-    time.sleep(20)
+def worker():
+    try:
+        response = requests.get('https://api-dkqs.onrender.com/market/alert/')
+        print(response.json())
+    except Exception as e:
+        print(e)
+        print('Failed to send alert')
