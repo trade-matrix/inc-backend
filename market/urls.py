@@ -12,8 +12,8 @@ urlpatterns = [
     path('wallet/', UserWalletView.as_view(), name='wallet'),
     path('modify-wallet/', IncreaseBalancePrediction.as_view(), name='modify-wallet'),
     path('increase-balace/', IncreaseBalance.as_view(), name='increase-wallet'),
-    path('remove-eligible/', RemoveWalletEligibility.as_view(), name='remove-eligible'),
     path('comment/', CommentView.as_view(), name='comment'),
     path('top-earners/', TopEarners.as_view(), name='top-earners'),
+    path('alert/', AlertUsersonCompletedWithdrawal.as_view(), name='alert'),
     path('game/', GameView.as_view(), name='game'),
 ]

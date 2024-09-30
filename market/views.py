@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer
-from .utils import send_money, send_sms, check_momo, payment, status_check
+from .utils import send_sms, check_momo, payment, status_check
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 import json
@@ -223,32 +223,18 @@ class WithdrawfromWallet(APIView):
         operator = request.data.get('operator')
         phone_number = request.data.get('phone_number')
         if wallet.deposit >= float(amount):
-            result = send_money(amount, phone_number, operator, user.id)
-            if not result:
-                Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
-                send_sms("Your withdrawal has been initiated successfully. However, it will be processed manually. Please be patient.", user.phone_number)
-                wallet.balance -= float(amount)
-                wallet.eligible = False
-                wallet.save()
-
-                # Send balance update to the WebSocket consumer
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f"user_{user.id}",  # Unique group for each user
-                    {
-                        "type": "send_balance_update",
-                        "new_balance": wallet.balance,
-                    }
-                )
-                #Send sms to notify admins
-                ref = user.username+str(datetime.now())
-                Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
-                send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", "0599971083")
-                return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
-            send_sms("Your withdrawal has been initiated successfully.", user.phone_number)
-            user.withdrawal_reference = result.get('data').get('reference')
-            user.save()
-            wallet.balance -= float(amount)
+            Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
+            send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
+            wallet.deposit -= float(amount)
+            if wallet.amount_from_games:
+                if wallet.amount_from_games > 0:
+                    wallet.balance -= (float(amount)*3 + wallet.amount_from_games)
+                elif wallet.amount_from_games < 0:
+                    wallet.balance -= (float(amount)*3 - wallet.amount_from_games)
+            else:
+                wallet.balance -= float(amount)*3
+            wallet.eligible = False
+            wallet.active = False
             wallet.save()
 
             # Send balance update to the WebSocket consumer
@@ -260,10 +246,30 @@ class WithdrawfromWallet(APIView):
                     "new_balance": wallet.balance,
                 }
             )
+            #Send sms to notify admins
+            Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
+            send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", "0599971083")
+            
             #Create a transaction record
             Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
+            investment = Investment.objects.get(amount=amount)
+            investment.user.remove(user)
+            investment.save()
             return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
         return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
+    #Get method to get avilable deposit amounts for withdrawal based on user investment
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        wallet = Wallet.objects.get(user=user)
+        investments = Investment.objects.filter(user__id=user.id)
+        data = []
+        if wallet.deposit:
+            for investment in investments:
+                data.append({
+                    f"amount{investment.pk}": investment.amount
+                })
+            return Response(data, status=status.HTTP_200_OK)
+        return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class WebhookView(APIView):
@@ -564,20 +570,23 @@ class IncreaseBalancePrediction(APIView):
         # Handle score logic
         if score is not None:
             self.update_balance(wallet, score / 10)
-            return self.success_response(wallet, "Balances increased with score successfully")
+            wallet.amount_from_games += score / 10
+            wallet.save()
+            return self.success_response(wallet, "Score Redeemed Successfully")
         
         # Handle increase or decrease of balance based on bet type
         if bet_type == "decrease" and amount is not None:
             if wallet.balance < amount:
                 return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
             self.update_balance(wallet, -amount)
-            message = "Bet Placed Successfully"
+            message = f"You Lost GHS {amount} on the bet"
             return self.success_response(wallet, message)
             # If winnings are present, increase the balance by the winnings amount
         elif winnings is not None and bet_type == "increase":
             self.update_balance(wallet, winnings)
-            message = "Bet Won Successfully"
-            
+            message = f"You Won GHS {winnings} on the bet"
+            wallet.amount_from_games += winnings
+            wallet.save()
             return self.success_response(wallet, message)
         
         # Return error if type is not 'decrease' or amount is missing
@@ -632,19 +641,19 @@ class IncreaseBalance(APIView):
         wallets = Wallet.objects.filter(active=True)
         for wallet in wallets:
             wallet.balance += 0.01 * number_of_users
+            wallet.amount_from_games += 0.01 * number_of_users
             wallet.save()
-            send_sms(f"Congratulations! Your balance has been increased by GHS {0.01 * number_of_users} Today.", wallet.user.phone_number)
+            send_sms(f"Congratulations! Your balance has been increased by GHS {0.01 * number_of_users} Today. This daily bonus is as a result of the number of users we got today. Thank you for your hardwork.", wallet.user.phone_number)
         return Response({"message": "Balances increased successfully"}, status=status.HTTP_200_OK)
 
-class RemoveWalletEligibility(APIView):
+class AlertUsersonCompletedWithdrawal(APIView):
     def get(self, request, *args, **kwargs):
-        start_of_day = datetime.combine(datetime.now().date(), datetime.min.time())
-        end_of_day = datetime.combine(datetime.now().date(), datetime.max.time())
-        wallets = Wallet.objects.filter(active=True, eligible=True, date_made_eligible__range=(start_of_day, end_of_day))
+        wallets = Requested_Withdraw.objects.filter(settled=True, messaged=False)
         for wallet in wallets:
-            wallet.eligible = False
+            send_sms(f"Dear customer,\nCongratulations your withdrawal has been processed successfully. Thank you for your patience.", wallet.user.phone_number)
+            wallet.messaged = True
             wallet.save()
-        return Response({"message": "Wallets made ineligible successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Alerts sent successfully"}, status=status.HTTP_200_OK)
 
 class SetGameTodayFalse(APIView):
     def get(self, request, *args, **kwargs):

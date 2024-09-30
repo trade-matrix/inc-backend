@@ -19,6 +19,7 @@ class Wallet(models.Model):
     user = models.OneToOneField(Customer, on_delete=models.CASCADE)
     deposit = models.FloatField(default=0.00)
     balance = models.FloatField(default=0.00)
+    amount_from_games = models.FloatField(default=0.00)
     eligible = models.BooleanField(default=False)
     active = models.BooleanField(default=False)
     date_made_eligible = models.DateTimeField(auto_now_add=False, blank=True, null=True)
@@ -66,6 +67,7 @@ class Requested_Withdraw(models.Model):
     operator = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     settled = models.BooleanField(default=False)
+    messaged = models.BooleanField(default=False)
     class Meta:
         verbose_name = 'Requested Withdraw'
         verbose_name_plural = 'Requested Withdraws'
