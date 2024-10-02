@@ -585,8 +585,6 @@ class IncreaseBalancePrediction(APIView):
         elif winnings is not None and bet_type == "increase":
             self.update_balance(wallet, winnings)
             message = f"You Won GHS {winnings} on the bet"
-            wallet.amount_from_games += winnings
-            wallet.save()
             return self.success_response(wallet, message)
         
         # Return error if type is not 'decrease' or amount is missing
@@ -604,6 +602,7 @@ class IncreaseBalancePrediction(APIView):
     def update_balance(self, wallet, amount):
         """Update the wallet balance and send WebSocket notification."""
         wallet.balance += amount
+        wallet.amount_from_games += amount
         wallet.save()
         self.send_balance_update(wallet)
     
