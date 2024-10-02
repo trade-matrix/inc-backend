@@ -227,10 +227,7 @@ class WithdrawfromWallet(APIView):
             send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
             wallet.deposit -= float(amount)
             if wallet.amount_from_games:
-                if wallet.amount_from_games > 0:
-                    wallet.balance -= (float(amount)*3 + wallet.amount_from_games)
-                elif wallet.amount_from_games < 0:
-                    wallet.balance -= (float(amount)*3 - wallet.amount_from_games)
+                wallet.balance -= (float(amount)*3 + wallet.amount_from_games)
             else:
                 wallet.balance -= float(amount)*3
             wallet.eligible = False
@@ -247,7 +244,6 @@ class WithdrawfromWallet(APIView):
                 }
             )
             #Send sms to notify admins
-            Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
             send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", "0599971083")
             
             #Create a transaction record
