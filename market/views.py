@@ -637,11 +637,13 @@ class IncreaseBalance(APIView):
         
         number_of_users = Customer.objects.filter(date_joined__range=(start_of_day, end_of_day)).count()
         wallets = Wallet.objects.filter(active=True)
+        numbers = []
         for wallet in wallets:
             wallet.balance += 0.01 * number_of_users
             wallet.amount_from_games += 0.01 * number_of_users
             wallet.save()
-            send_sms(f"Congratulations! Your balance has been increased by GHS {0.01 * number_of_users} Today. This daily bonus is as a result of the number of users we got today. Thank you for your hardwork.", wallet.user.phone_number)
+            numbers.append(wallet.user.phone_number)
+        send_sms(f"Congratulations! Your balance has been increased by GHS {0.01 * number_of_users} Today. This daily bonus is as a result of the number of users we got today. Thank you for your hardwork.", numbers)
         return Response({"message": "Balances increased successfully"}, status=status.HTTP_200_OK)
 
 class AlertUsersonCompletedWithdrawal(APIView):
