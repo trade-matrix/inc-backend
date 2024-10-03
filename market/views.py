@@ -629,7 +629,7 @@ class IncreaseBalancePrediction(APIView):
         )
 
 #Worker APIS
-# worker to increase balance in all active wallets according to number of users created in that day.
+#Worker to increase balance in all active wallets according to number of users created in that day.
 class IncreaseBalance(APIView):
     def get(self, request, *args, **kwargs):
         start_of_day = datetime.combine(datetime.now().date(), datetime.min.time())
