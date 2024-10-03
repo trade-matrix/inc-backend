@@ -44,9 +44,9 @@ class PredictionSerializer(serializers.Serializer):
     winnings = serializers.CharField(required=False)
 
 class CommentSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(required=False)
+    name = serializers.CharField(required=False, allow_blank=True)
     user = serializers.StringRelatedField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True, required=False)
+    created_at = serializers.DateTimeField(read_only=True, required=False, allow_null=True)
     class Meta:
         model = Comment
         fields = '__all__'
