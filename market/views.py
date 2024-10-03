@@ -230,12 +230,8 @@ class WithdrawfromWallet(APIView):
                 wallet.balance -= (float(amount)*3 + wallet.amount_from_games)
             else:
                 wallet.balance -= float(amount)*3
-            wallet.eligible = False
-            wallet.active = False
+            wallet.balance = max(wallet.balance, 0)
             wallet.save()
-            if wallet.balance < 0:
-                wallet.balance = 0
-                wallet.save()
             # Send balance update to the WebSocket consumer
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
@@ -253,6 +249,11 @@ class WithdrawfromWallet(APIView):
             investment = Investment.objects.get(amount=amount)
             investment.user.remove(user)
             investment.save()
+            user_active_investments = Investment.objects.filter(user__id=user.id).count()
+            if user_active_investments == 0:
+                wallet.active = False
+                wallet.eligible = False
+                wallet.save()
             return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
         return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
     #Get method to get avilable deposit amounts for withdrawal based on user investment
