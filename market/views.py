@@ -251,6 +251,7 @@ class WithdrawfromWallet(APIView):
             investment.save()
             user_active_investments = Investment.objects.filter(user__id=user.id).count()
             if user_active_investments == 0:
+                wallet.balance = 0
                 wallet.active = False
                 wallet.eligible = False
                 wallet.save()
@@ -449,6 +450,7 @@ class WebhookView(APIView):
                     referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
                     if referrer_wallet.user.verified:
                         referrer_wallet.balance += (amount*investment.interest)*0.5
+                        referrer_wallet.amount_from_games += (amount*investment.interest)*0.5
                         referrer_wallet.save()
                         transaction = Transaction.objects.get(user=user.referred_by, status='pending', type='referal', reffered=user.username)
                         transaction.status = 'completed'
