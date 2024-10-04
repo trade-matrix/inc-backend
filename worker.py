@@ -7,3 +7,5 @@ def worker():
     except Exception as e:
         print(e)
         print('Failed to send alert')
+
+worker()

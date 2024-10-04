@@ -450,7 +450,7 @@ class WebhookView(APIView):
                     referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
                     if referrer_wallet.user.verified:
                         referrer_wallet.balance += (amount*investment.interest)*0.5
-                        referrer_wallet.amount_from_games += (amount*investment.interest)*0.5
+                        referrer_wallet.amount_from_games -= (amount*investment.interest)*0.5
                         referrer_wallet.save()
                         transaction = Transaction.objects.get(user=user.referred_by, status='pending', type='referal', reffered=user.username)
                         transaction.status = 'completed'
