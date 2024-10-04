@@ -447,44 +447,54 @@ class WebhookView(APIView):
                         }
                     )
                     referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
-                    referrer_wallet.balance += (amount*investment.interest)*0.5
-                    referrer_wallet.save()
-                    transaction = Transaction.objects.get(user=user.referred_by, status='pending', type='referal', reffered=user.username)
-                    transaction.status = 'completed'
-                    transaction.amount = (amount*investment.interest)*0.15
-                    transaction.save()
-                    # Send balance update to the WebSocket consumer
-                    balance_data ={
-                        "new_balance": referrer_wallet.balance,
-                        "earnings": referrer_wallet.balance - referrer_wallet.deposit
-                    }
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_{user.referred_by.id}",
-                        {
-                            "type": "send_balance_update",
-                            "new_balance": balance_data,
+                    if referrer_wallet.user.verified:
+                        referrer_wallet.balance += (amount*investment.interest)*0.5
+                        referrer_wallet.save()
+                        transaction = Transaction.objects.get(user=user.referred_by, status='pending', type='referal', reffered=user.username)
+                        transaction.status = 'completed'
+                        transaction.amount = (amount*investment.interest)*0.15
+                        transaction.save()
+                        # Send balance update to the WebSocket consumer
+                        balance_data ={
+                            "new_balance": referrer_wallet.balance,
+                            "earnings": referrer_wallet.balance - referrer_wallet.deposit
                         }
-                    )
-                    #Send Transsaction to WebSocket
-                    transaction_data = {
-                        'id': transaction.id,
-                        'user': transaction.user,  # Assuming you're using the user's ID
-                        'amount': transaction.amount,
-                        'status': transaction.status,
-                        'type': transaction.type,
-                        'reffered': transaction.reffered,
-                        'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
-                    }
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_{user.referred_by.id}",
-                        {
-                            'type': 'send_user_transaction',
-                            'transaction': transaction_data
+                        async_to_sync(channel_layer.group_send)(
+                            f"user_{user.referred_by.id}",
+                            {
+                                "type": "send_balance_update",
+                                "new_balance": balance_data,
+                            }
+                        )
+                        #Send Transsaction to WebSocket
+                        transaction_data = {
+                            'id': transaction.id,
+                            'user': transaction.user,  # Assuming you're using the user's ID
+                            'amount': transaction.amount,
+                            'status': transaction.status,
+                            'type': transaction.type,
+                            'reffered': transaction.reffered,
+                            'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
                         }
-                    )
+                        async_to_sync(channel_layer.group_send)(
+                            f"user_{user.referred_by.id}",
+                            {
+                                'type': 'send_user_transaction',
+                                'transaction': transaction_data
+                            }
+                        )
 
-                    send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 50% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings.", user.phone_number)
-                    send_sms(f"Congratulations! You just earned 50% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
+                        send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 50% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings.", user.phone_number)
+                        send_sms(f"Congratulations! You just earned 50% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
+                    else:
+                        wallet.balance += ((amount*(investment.interest)) + amount)*0.5
+                        wallet.deposit += amount  # For example, adding a deposit
+                        # Update the wallet balance
+                        wallet.active = True
+                        wallet.eligible = True
+                        wallet.date_made_eligible = datetime.now()
+                        wallet.save()
+                        send_sms(f"Congratulations! Your investment has been made successful. You can withdraw your returns after the target is reached.", user.phone_number)
                     return Response({"message": "Payment successful"}, status=200)
                 send_sms(f"Congratulations! Your investment has been made successful. You can withdraw your returns after the target is reached.", user.phone_number)
                 return Response({"message": "Payment successful"}, status=200)
@@ -636,7 +646,7 @@ class IncreaseBalance(APIView):
         end_of_day = datetime.combine(datetime.now().date(), datetime.max.time())
         
         number_of_users = Customer.objects.filter(date_joined__range=(start_of_day, end_of_day)).count()
-        wallets = Wallet.objects.filter(active=True)
+        wallets = Wallet.objects.filter(user__verified=True)
         numbers = []
         for wallet in wallets:
             wallet.balance += 0.01 * number_of_users

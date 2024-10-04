@@ -168,6 +168,8 @@ class UserCreateReferalLink(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [TokenAuthentication,SessionAuthentication]
     def get(self, request, *args, **kwargs):
+        if not request.user.verified:
+            return Response({"message": "Investment required before you can refer."}, status=status.HTTP_400_BAD_REQUEST)
         user = request.user
         referal_link = f"https://trade-matrix.net/auth/sign-up/?referral={user.username}"
         data = {
