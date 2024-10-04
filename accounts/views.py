@@ -152,7 +152,7 @@ class UserResendOTP(generics.CreateAPIView):
 class TotalNumberOfUsers(generics.GenericAPIView):
     permission_classes = [AllowAny]
     def get(self, request, *args, **kwargs):
-        users = Customer.objects.all().count()
+        users = Customer.objects.filter(verified=True).count()
         user_percentage = (users/200000)*100
         if user_percentage < 10:
             user_percentage = 10
