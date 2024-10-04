@@ -231,6 +231,7 @@ class WithdrawfromWallet(APIView):
             else:
                 wallet.balance -= float(amount)*3
             wallet.balance = max(wallet.balance, 0)
+            wallet.amount_from_games = 0
             wallet.save()
             # Send balance update to the WebSocket consumer
             channel_layer = get_channel_layer()
