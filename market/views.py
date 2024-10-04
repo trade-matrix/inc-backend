@@ -397,7 +397,7 @@ class WebhookView(APIView):
                         }
                     )
                 elif user.referred_by:
-                    wallet.balance += ((amount*(investment.interest)) + amount)*0.5
+                    wallet.balance += ((amount*(investment.interest)) *0.5)+ amount
                     wallet.deposit += amount  # For example, adding a deposit
                     # Update the wallet balance
                     wallet.active = True
@@ -494,9 +494,9 @@ class WebhookView(APIView):
                         wallet.eligible = True
                         wallet.date_made_eligible = datetime.now()
                         wallet.save()
-                        send_sms(f"Congratulations! Your investment has been made successful. You can withdraw your returns after the target is reached.", user.phone_number)
+                        send_sms(f"Congratulations! Your investment has been made successfully. You can withdraw your returns after the target is reached.", user.phone_number)
                     return Response({"message": "Payment successful"}, status=200)
-                send_sms(f"Congratulations! Your investment has been made successful. You can withdraw your returns after the target is reached.", user.phone_number)
+                send_sms(f"Congratulations! Your investment has been made successfully. You can withdraw your returns after the target is reached.", user.phone_number)
                 return Response({"message": "Payment successful"}, status=200)
 
             # Respond with a success message
