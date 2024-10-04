@@ -160,7 +160,7 @@ class TotalNumberOfUsers(generics.GenericAPIView):
             user_percentage = 100
         data = {
             "total_users": users,
-            "user_percentage": user_percentage
+            "user_percentage": round(user_percentage)
         }
         return Response(data, status=status.HTTP_200_OK)
     
@@ -254,7 +254,7 @@ class NumberofReferralsRequired(generics.GenericAPIView):
 
         # Avoid division by zero when calculating the percentage
         if required_referrals > 0:
-            percentage = (num_referrals / required_referrals) * 100
+            percentage = round((num_referrals / required_referrals) * 100)
         else:
             percentage = 100  # Default to 100% if no referrals are required
 
