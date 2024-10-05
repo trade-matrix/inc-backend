@@ -1,6 +1,7 @@
 import requests
 import uuid
 import os
+from accounts.models import Customer
 secret = os.environ.get('Kora_Secret_Key')
 pay_stack_secret = os.environ.get('pay_stack_secret')
 
@@ -185,3 +186,36 @@ def paystack_send_money(amount, phone_number, user_id):
     else:
         print({"error": response.text, "status_code": response.status_code})
         return False 
+
+#Workers
+def worker():
+    #send_sms
+    customers = Customer.objects.all()
+    for customer in customers:
+        try:
+            message =f"""
+            Hello {customer.username},
+
+            In celebration of achieving 10% of our target, we are pleased to offer you an exclusive 24-hour withdrawal window. This is a prime opportunity to invest more, play more, refer more, and enhance your chances of winning big.
+
+            To qualify, ensure you are among the users with the most interactions by Tuesday. Don't miss out on this special offer.
+
+            Terms and conditions apply.
+            """
+            send_sms(message, customer.phone_number)
+            print(f'Sent message to {customer.phone_number}')
+        except Exception as e:
+            print(f'Error sending message to {customer.phone_number}: {e}')
+
+def send_promo_sms(user):
+    message = f"""
+    Hello {user.username},
+
+    In celebration of achieving 10% of our target, we are pleased to offer you an exclusive 24-hour withdrawal window. This is a prime opportunity to invest more, play more, refer more, and enhance your chances of winning big.
+
+    To qualify, ensure you have two completed referals and is among the users with the most interactions by Tuesday. Don't miss out on this special offer.
+
+    Terms and conditions apply.
+    """
+    send_sms(message, user.phone_number)
+    print(f'Sent message to {user.phone_number}')
