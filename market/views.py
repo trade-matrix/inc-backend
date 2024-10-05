@@ -453,10 +453,13 @@ class WebhookView(APIView):
                         referrer_wallet.balance += (amount*investment.interest)*0.5
                         referrer_wallet.amount_from_games -= (amount*investment.interest)*0.5
                         referrer_wallet.save()
-                        transaction = Transaction.objects.get(user=user.referred_by, status='pending', type='referal', reffered=user.username)
-                        transaction.status = 'completed'
-                        transaction.amount = (amount*investment.interest)*0.15
-                        transaction.save()
+                        try:
+                            transaction = Transaction.objects.get(user=user.referred_by, status='pending', type='referal', reffered=user.username)
+                            transaction.status = 'completed'
+                            transaction.amount = (amount*investment.interest)*0.5
+                            transaction.save()
+                        except Transaction.DoesNotExist:
+                            transaction = Transaction.objects.create(user=user.referred_by, amount=(amount*investment.interest)*0.5, status='completed', type='referal', reffered=user.username)
                         # Send balance update to the WebSocket consumer
                         balance_data ={
                             "new_balance": referrer_wallet.balance,
