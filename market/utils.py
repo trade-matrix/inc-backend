@@ -196,11 +196,11 @@ def worker():
             message =f"""
             Hello {customer.username},
 
-            In celebration of achieving 10% of our target, we are pleased to offer you an exclusive 24-hour withdrawal window. This is a prime opportunity to invest more, play more, refer more, and enhance your chances of winning big.
+We are excited to inform you that for today only, your Math Game scores will equal the exact points you earn, rather than being divided by 10 as they were previously!
 
-            To qualify, ensure you are among the users with the most interactions by Tuesday. Don't miss out on this special offer.
+Take advantage of this exclusive offer now!
 
-            Terms and conditions apply.
+Terms and conditions apply.
             """
             send_sms(message, customer.phone_number)
             print(f'Sent message to {customer.phone_number}')
