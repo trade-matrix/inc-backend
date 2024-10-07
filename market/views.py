@@ -584,8 +584,8 @@ class IncreaseBalancePrediction(APIView):
 
         # Handle score logic
         if score is not None:
-            self.update_balance(wallet, score)
-            wallet.amount_from_games += score
+            self.update_balance(wallet, score/10)
+            wallet.amount_from_games += score/10
             wallet.save()
             return self.success_response(wallet, "Score Redeemed Successfully")
         
