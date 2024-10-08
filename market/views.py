@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer
-from .utils import send_sms, check_momo, payment, status_check
+from .utils import send_sms, check_momo, payment, status_check, withdraw_optout, handle_payment, withdraw
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 import json
@@ -222,53 +222,29 @@ class WithdrawfromWallet(APIView):
         amount = request.data.get('amount')
         operator = request.data.get('operator')
         phone_number = request.data.get('phone_number')
-        if wallet.deposit >= float(amount):
-            Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
-            send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
-            wallet.deposit -= float(amount)
-            if wallet.amount_from_games:
-                wallet.balance -= (float(amount)*3 + wallet.amount_from_games)
-            else:
-                wallet.balance -= float(amount)*3
-            wallet.balance = max(wallet.balance, 0)
-            wallet.amount_from_games = 0
-            wallet.save()
-            # Send balance update to the WebSocket consumer
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f"user_{user.id}",  # Unique group for each user
-                {
-                    "type": "send_balance_update",
-                    "new_balance": wallet.balance,
-                }
-            )
-            #Send sms to notify admins
-            send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", "0599971083")
-            
-            #Create a transaction record
-            Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
-            investment = Investment.objects.get(amount=amount)
-            investment.user.remove(user)
-            investment.save()
-            user_active_investments = Investment.objects.filter(user__id=user.id).count()
-            if user_active_investments == 0:
-                wallet.balance = 0
-                wallet.active = False
-                wallet.eligible = False
-                wallet.save()
+        #withdarw = withdraw_optout(user,wallet, amount, operator, phone_number)
+        withdarw = withdraw(user, wallet, amount, operator, phone_number)
+        if withdarw:
             return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
         return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
     #Get method to get avilable deposit amounts for withdrawal based on user investment
     def get(self, request, *args, **kwargs):
         user = request.user
         wallet = Wallet.objects.get(user=user)
-        investments = Investment.objects.filter(user__id=user.id)
+        #investments = Investment.objects.filter(user__id=user.id)
         data = []
         if wallet.deposit:
-            for investment in investments:
-                data.append({
-                    f"amount{investment.pk}": investment.amount
-                })
+            if wallet.balance > 10:
+                if wallet.balance < 251:
+                    data.append({
+                        "amount1": wallet.balance
+                    })
+                elif wallet.balance:
+                    data.append({
+                        "amount1": 250
+                    })
+            else:
+                return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
             return Response(data, status=status.HTTP_200_OK)
         return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -348,161 +324,9 @@ class WebhookView(APIView):
                 investment = Investment.objects.get(amount=amount)
                 wallet,_ = Wallet.objects.get_or_create(user=user)
                 # Update the wallet balance
-                if not user.referred_by:
-                    wallet.balance += (amount*(investment.interest)) + amount
-                    wallet.deposit += amount  # For example, adding a deposit
-                    # Update the wallet balance
-                    wallet.active = True
-                    wallet.eligible = True
-                    wallet.date_made_eligible = datetime.now()
-                    wallet.save()
-                    # Create a transaction record
-                    transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
-                    # Serialize the transaction into JSON-serializable data
-                    transaction_data = {
-                        'id': transaction.id,
-                        'user': transaction.user.id,  # Assuming you're using the user's ID
-                        'amount': transaction.amount,
-                        'status': transaction.status,
-                        'type': transaction.type,
-                        'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
-                    }
-
-                    # Send the serialized transaction to the WebSocket consumer
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_{user.id}",
-                        {
-                            "type": "send_user_transaction",
-                            "transaction": transaction_data  # Send the serialized data
-                        }
-                    )
-
-                    # Send balance update to the WebSocket consumer
-                    balance_data ={
-                        "new_balance": wallet.balance,
-                        "earnings": wallet.balance - wallet.deposit
-                    }
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_{user.id}",  # Unique group for each user
-                        {
-                            "type": "send_balance_update",
-                            "new_balance": balance_data,
-                        }
-                    )
-                    investment.user.add(user)
-                    investment.save()
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_{user.id}",
-                        {
-                            "type": "send_user_verified",
-                        }
-                    )
-                elif user.referred_by:
-                    wallet.balance += ((amount*(investment.interest)) *0.5)+ amount
-                    wallet.deposit += amount  # For example, adding a deposit
-                    # Update the wallet balance
-                    wallet.active = True
-                    wallet.eligible = True
-                    wallet.date_made_eligible = datetime.now()
-                    wallet.save()
-                    # Create a transaction record
-                    transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
-                    # Serialize the transaction into JSON-serializable data
-                    transaction_data = {
-                        'id': transaction.id,
-                        'user': transaction.user.id,  # Assuming you're using the user's ID
-                        'amount': transaction.amount,
-                        'status': transaction.status,
-                        'type': transaction.type,
-                        'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
-                    }
-
-                    # Send the serialized transaction to the WebSocket consumer
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_{user.id}",
-                        {
-                            "type": "send_user_transaction",
-                            "transaction": transaction_data  # Send the serialized data
-                        }
-                    )
-
-                    # Send balance update to the WebSocket consumer
-                    balance_data ={
-                        "new_balance": wallet.balance,
-                        "earnings": wallet.balance - wallet.deposit
-                    }
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_{user.id}",  # Unique group for each user
-                        {
-                            "type": "send_balance_update",
-                            "new_balance": balance_data,
-                        }
-                    )
-                    investment.user.add(user)
-                    investment.save()
-                    async_to_sync(channel_layer.group_send)(
-                        f"user_{user.id}",
-                        {
-                            "type": "send_user_verified",
-                        }
-                    )
-                    referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
-                    if referrer_wallet.user.verified:
-                        referrer_wallet.balance += (amount*investment.interest)*0.5
-                        referrer_wallet.amount_from_games -= (amount*investment.interest)*0.5
-                        referrer_wallet.save()
-                        try:
-                            transaction = Transaction.objects.get(user=user.referred_by, status='pending', type='referal', reffered=user.username)
-                            transaction.status = 'completed'
-                            transaction.amount = (amount*investment.interest)*0.5
-                            transaction.save()
-                        except Transaction.DoesNotExist:
-                            transaction = Transaction.objects.create(user=user.referred_by, amount=(amount*investment.interest)*0.5, status='completed', type='referal', reffered=user.username)
-                        # Send balance update to the WebSocket consumer
-                        balance_data ={
-                            "new_balance": referrer_wallet.balance,
-                            "earnings": referrer_wallet.balance - referrer_wallet.deposit
-                        }
-                        async_to_sync(channel_layer.group_send)(
-                            f"user_{user.referred_by.id}",
-                            {
-                                "type": "send_balance_update",
-                                "new_balance": balance_data,
-                            }
-                        )
-                        #Send Transsaction to WebSocket
-                        transaction_data = {
-                            'id': transaction.id,
-                            'user': transaction.user,  # Assuming you're using the user's ID
-                            'amount': transaction.amount,
-                            'status': transaction.status,
-                            'type': transaction.type,
-                            'reffered': transaction.reffered,
-                            'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
-                        }
-                        async_to_sync(channel_layer.group_send)(
-                            f"user_{user.referred_by.id}",
-                            {
-                                'type': 'send_user_transaction',
-                                'transaction': transaction_data
-                            }
-                        )
-
-                        send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 50% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings.", user.phone_number)
-                        send_sms(f"Congratulations! You just earned 50% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
-                    else:
-                        wallet.balance += ((amount*(investment.interest)) + amount)*0.5
-                        wallet.deposit += amount  # For example, adding a deposit
-                        # Update the wallet balance
-                        wallet.active = True
-                        wallet.eligible = True
-                        wallet.date_made_eligible = datetime.now()
-                        wallet.save()
-                        send_sms(f"Congratulations! Your investment has been made successfully. You can withdraw your returns after the target is reached.", user.phone_number)
-                    return Response({"message": "Payment successful"}, status=200)
-                send_sms(f"Congratulations! Your investment has been made successfully. You can withdraw your returns after the target is reached.", user.phone_number)
+                h = handle_payment(user, wallet, investment, amount)
+                if not h:
+                    return Response({"error": "Payment failed"}, status=400)
                 return Response({"message": "Payment successful"}, status=200)
 
             # Respond with a success message
