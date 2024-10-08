@@ -234,7 +234,7 @@ class WithdrawfromWallet(APIView):
         #investments = Investment.objects.filter(user__id=user.id)
         data = []
         if wallet.deposit:
-            if wallet.balance > 10:
+            if wallet.balance > 10 and wallet.date_made_eligible + timedelta(days=1) < datetime.now():
                 if wallet.balance < 251:
                     data.append({
                         "amount1": wallet.balance
@@ -244,7 +244,7 @@ class WithdrawfromWallet(APIView):
                         "amount1": 250
                     })
             else:
-                return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Not Eligible for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
             return Response(data, status=status.HTTP_200_OK)
         return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -490,7 +490,7 @@ class AlertUsersonCompletedWithdrawal(APIView):
     def get(self, request, *args, **kwargs):
         wallets = Requested_Withdraw.objects.filter(settled=True, messaged=False)
         for wallet in wallets:
-            send_sms(f"Dear customer,\nCongratulations your withdrawal has been processed successfully. Thank you for your patience.", wallet.user.phone_number)
+            send_sms(f"Dear {wallet.user.username},\nCongratulations your withdrawal of GHS {wallet.amount} has been processed successfully. Thank you for your patience.", wallet.user.phone_number)
             wallet.messaged = True
             wallet.save()
         return Response({"message": "Alerts sent successfully"}, status=status.HTTP_200_OK)
