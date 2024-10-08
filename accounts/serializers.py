@@ -19,6 +19,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return value.replace(' ', '_')
 
     def create(self, validated_data):
+        # Validate the username
+        validated_data['username'] = self.validate_username(validated_data.get('username', ''))
+
         password = "defaultpassword"
         # The username will already have been sanitized by validate_username
         user = Customer.objects.create(**validated_data, password=password)
