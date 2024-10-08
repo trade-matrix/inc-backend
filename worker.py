@@ -2,7 +2,7 @@ import requests
 
 def worker():
     try:
-        response = requests.get('https://api-dkqs.onrender.com/market/alert/')
+        response = requests.get('http://127.0.0.1:8000/market/alert/')
         print(response.json())
     except Exception as e:
         print(e)
