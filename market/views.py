@@ -324,7 +324,7 @@ class WebhookView(APIView):
                 investment = Investment.objects.get(amount=amount)
                 wallet,_ = Wallet.objects.get_or_create(user=user)
                 # Update the wallet balance
-                h = handle_payment(user, wallet, investment, amount)
+                h = handle_payment(user, investment, wallet, amount)
                 if not h:
                     return Response({"error": "Payment failed"}, status=400)
                 return Response({"message": "Payment successful"}, status=200)
