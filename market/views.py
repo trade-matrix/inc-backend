@@ -8,7 +8,7 @@ from .models import Wallet, Operator, Transaction, Comment, Requested_Withdraw, 
 from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerializer, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer, CommentSerializer, GameSerializer
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
-from accounts.models import Customer
+from accounts.models import Customer, Ref
 from .utils import send_sms, check_momo, payment, status_check, withdraw_optout, handle_payment, withdraw
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
@@ -47,6 +47,7 @@ class UserInvest(APIView):
             reference = payment_response['data']['reference']
             user.reference = reference
             user.save()
+            Ref.objects.create(reference=reference, user=user)
             data = {
                 "payment_response": payment_response,
             }
@@ -313,13 +314,13 @@ class WebhookView(APIView):
                 send_sms("Your withdrawal failed. Your balance has been reverted.", phone_number)   
             elif payload.get('event') == 'charge.success':
                 reference = payload['data']['reference']
-                print(reference)
                 try:
                     user = Customer.objects.get(reference=reference)
                     user.verified = True
                     user.save()
                 except Customer.DoesNotExist:
-                    return Response({"error": "User not found"}, status=404)
+                    ref = Ref.objects.get(reference=reference)
+                    user = ref.user
                 amount = float(payload['data']['amount'])-float(payload['data']['fee'])
                 investment = Investment.objects.get(amount=amount)
                 wallet,_ = Wallet.objects.get_or_create(user=user)

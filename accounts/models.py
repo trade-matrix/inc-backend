@@ -11,3 +11,10 @@ class Customer(AbstractUser):
     reference = models.CharField(max_length=255, blank=True, null=True)
     referal_code = models.CharField(max_length=255, blank=True, null=True)
     withdrawal_reference = models.CharField(max_length=255, blank=True, null=True)
+
+class Ref(models.Model):
+    reference = models.CharField(max_length=255)
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.reference
