@@ -254,7 +254,7 @@ class WithdrawfromWallet(APIView):
         wallet = Wallet.objects.get(user=user)
         investments = Investment.objects.filter(user__id=user.id)
         data = []
-        if wallet.deposit:
+        if wallet.deposit and wallet.date_made_eligible + timedelta(days=5) >= datetime.now():
             for investment in investments:
                 data.append({
                     f"amount{investment.pk}": investment.amount
