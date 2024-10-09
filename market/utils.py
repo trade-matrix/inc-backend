@@ -260,7 +260,7 @@ def withdraw(user, wallet, amount, operator, phone_number):
 
 def handle_payment(user, investment, wallet, amount):
     if not user.referred_by:
-        wallet.balance += (amount*(investment.interest)) + amount
+        wallet.balance += min((amount*(investment.interest)) + amount,1200)
         wallet.deposit += amount  # For example, adding a deposit
         # Update the wallet balance
         wallet.active = True
@@ -310,7 +310,7 @@ def handle_payment(user, investment, wallet, amount):
             }
         )
     elif user.referred_by:
-        wallet.balance += ((amount*(investment.interest)) *0.5)+ amount
+        wallet.balance += min(((amount*(investment.interest)) *0.5)+ amount,1200)
         wallet.deposit += amount  # For example, adding a deposit
         # Update the wallet balance
         wallet.active = True
@@ -361,7 +361,7 @@ def handle_payment(user, investment, wallet, amount):
         )
         referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
         if referrer_wallet.user.verified:
-            referrer_wallet.balance += (amount*investment.interest)*0.5
+            referrer_wallet.balance += min((amount * investment.interest) * 0.5, 1200)
             referrer_wallet.amount_from_games -= (amount*investment.interest)*0.5
             referrer_wallet.save()
             try:
@@ -428,6 +428,7 @@ def worker():
             print(f'Error sending message to {customer.phone_number}: {e}')
 
 def send_promo_sms(user):
-    message = message_decider('promo', user, 10)
+    message = message_decider('news', user, 10)
     send_sms(message, user.phone_number)
     print(f'Sent message to {user.phone_number}')
+

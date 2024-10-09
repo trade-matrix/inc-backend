@@ -441,7 +441,7 @@ class IncreaseBalancePrediction(APIView):
     
     def update_balance(self, wallet, amount):
         """Update the wallet balance and send WebSocket notification."""
-        wallet.balance += amount
+        wallet.balance += min(amount,1200)
         wallet.amount_from_games += amount
         wallet.save()
         self.send_balance_update(wallet)
