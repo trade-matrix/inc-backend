@@ -223,13 +223,13 @@ class WithdrawfromWallet(APIView):
         amount = request.data.get('amount')
         operator = request.data.get('operator')
         phone_number = request.data.get('phone_number')
-        #withdarw = withdraw_optout(user,wallet, amount, operator, phone_number)
-        withdarw = withdraw(user, wallet, amount, operator, phone_number)
+        withdarw = withdraw_optout(user,wallet, amount, operator, phone_number)
+        #withdarw = withdraw(user, wallet, amount, operator, phone_number)
         if withdarw:
             return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
         return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
     #Get method to get avilable deposit amounts for withdrawal based on user investment
-    def get(self, request, *args, **kwargs):
+    """def get(self, request, *args, **kwargs):
         user = request.user
         wallet = Wallet.objects.get(user=user)
         #investments = Investment.objects.filter(user__id=user.id)
@@ -248,7 +248,19 @@ class WithdrawfromWallet(APIView):
                 return Response({"error": "Not Eligible for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
             return Response(data, status=status.HTTP_200_OK)
         return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
-
+    """
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        wallet = Wallet.objects.get(user=user)
+        investments = Investment.objects.filter(user__id=user.id)
+        data = []
+        if wallet.deposit:
+            for investment in investments:
+                data.append({
+                    f"amount{investment.pk}": investment.amount
+                })
+            return Response(data, status=status.HTTP_200_OK)
+        return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
 @method_decorator(csrf_exempt, name='dispatch')
 class WebhookView(APIView):
     def post(self, request, *args, **kwargs):

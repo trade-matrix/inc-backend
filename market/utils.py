@@ -431,4 +431,3 @@ def send_promo_sms(user):
     message = message_decider('news', user, 10)
     send_sms(message, user.phone_number)
     print(f'Sent message to {user.phone_number}')
-
