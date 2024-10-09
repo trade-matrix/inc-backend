@@ -24,7 +24,7 @@ class UserRegistrationView(generics.CreateAPIView):
             response = super().post(request, *args, **kwargs)
             if response.status_code == status.HTTP_201_CREATED:
                 user = Customer.objects.get(username=request.data['username'])
-                #send_promo_sms(user)
+                send_promo_sms(user)
                 user_id = user.id
                 response.data['user_id'] = user_id
             return response
