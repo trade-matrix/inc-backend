@@ -2,12 +2,10 @@ def message_decider(message, customer, percentage):
     if message == 'news':
         return f"""
             Hello {customer.username},
-
-We are excited to inform you that for today only, your Math Game scores will equal the exact points you earn, rather than being divided by 10 as they were previously!
-
-Take advantage of this exclusive offer now!
-
-Terms and conditions apply.
+We are excited to inform you that Trade-Matrix now owns a telegram Channel. Join our channel to learn more on how your funds
+are being managed and to get the latest updates on our services.
+https://t.me/tradematrixnet
+The Trade-Matrix Team.
 """
     elif message == 'promo':
         return f"""
