@@ -157,7 +157,7 @@ class TotalNumberOfUsers(generics.GenericAPIView):
         users = Customer.objects.filter(verified=True).count()
         user_percentage = (users/200000)*100
         if user_percentage < 10:
-            user_percentage = 10
+            user_percentage = 13
         elif user_percentage > 100:
             user_percentage = 100
         data = {
