@@ -246,15 +246,17 @@ class WithdrawfromWallet(APIView):
         
         data = []
         for wallet in selected_wallets:
-            if wallet.balance > 10 and wallet.date_made_eligible + timedelta(days=1) < timezone.now():
-                if wallet.balance < 251:
-                    data.append({
-                        "amount1": wallet.balance
-                    })
-                else:
-                    data.append({
-                        "amount1": 250
-                    })
+            #check if the wallet belongs to the selected user
+            if wallet.user == user:
+                if wallet.balance > 10 and wallet.date_made_eligible + timedelta(days=1) < timezone.now():
+                    if wallet.balance < 251:
+                        data.append({
+                            "amount1": wallet.balance
+                        })
+                    else:
+                        data.append({
+                            "amount1": 250
+                        })
         if data:
             return Response(data, status=status.HTTP_200_OK)
         else:
