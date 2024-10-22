@@ -417,15 +417,17 @@ def handle_payment(user, investment, wallet, amount):
     return True
 #Workers
 def worker():
-    #send_sms
-    customers = Customer.objects.all()
+   
+    customers = Customer.objects.filter(username='Khalebb')
+    
     for customer in customers:
         try:
-            message = message_decider('news', customer, 10)
+            message = message_decider('opened', customer, 10)
             send_sms(message, customer.phone_number)
-            print(f'Sent message to {customer.phone_number}')
+            print(f'Sent message to {customer.username}')
         except Exception as e:
             print(f'Error sending message to {customer.phone_number}: {e}')
+
 
 def send_promo_sms(user):
     message = message_decider('news', user, 10)

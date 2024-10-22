@@ -223,31 +223,42 @@ class WithdrawfromWallet(APIView):
         amount = request.data.get('amount')
         operator = request.data.get('operator')
         phone_number = request.data.get('phone_number')
-        withdarw = withdraw_optout(user,wallet, amount, operator, phone_number)
-        #withdarw = withdraw(user, wallet, amount, operator, phone_number)
+        #withdarw = withdraw_optout(user,wallet, amount, operator, phone_number)
+        withdarw = withdraw(user, wallet, amount, operator, phone_number)
         if withdarw:
             return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
         return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
     #Get method to get avilable deposit amounts for withdrawal based on user investment
-    """def get(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         user = request.user
         wallet = Wallet.objects.get(user=user)
-        #investments = Investment.objects.filter(user__id=user.id)
+        # investments = Investment.objects.filter(user__id=user.id)
+        
+        selected_wallets = []
+        
+        # Step 1: Filter wallets with deposit=15 and balance > 100, limit to 3 results
+        selected_users = Wallet.objects.filter(deposit=15, balance__gt=100)[:3]
+        selected_wallets.extend(selected_users)
+        
+        # Step 2: Filter wallets by specific usernames
+        selected_usernames = ['DeAgusco', 'Khalebb']
+        selected_wallets.extend(Wallet.objects.filter(user__username__in=selected_usernames))
+        
         data = []
-        if wallet.deposit:
-            if wallet.balance > 10 and wallet.date_made_eligible + timedelta(days=1) < datetime.now():
+        for wallet in selected_wallets:
+            if wallet.balance > 10 and wallet.date_made_eligible + timedelta(days=1) < timezone.now():
                 if wallet.balance < 251:
                     data.append({
                         "amount1": wallet.balance
                     })
-                elif wallet.balance:
+                else:
                     data.append({
                         "amount1": 250
                     })
-            else:
-                return Response({"error": "Not Eligible for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
+        if data:
             return Response(data, status=status.HTTP_200_OK)
-        return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
     """
     def get(self, request, *args, **kwargs):
         user = request.user
@@ -261,6 +272,7 @@ class WithdrawfromWallet(APIView):
                 })
             return Response(data, status=status.HTTP_200_OK)
         return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
+    """
 @method_decorator(csrf_exempt, name='dispatch')
 class WebhookView(APIView):
     def post(self, request, *args, **kwargs):
