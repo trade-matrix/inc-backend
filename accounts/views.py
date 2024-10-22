@@ -269,7 +269,7 @@ class NumberofReferralsRequired(generics.GenericAPIView):
             "percentage": percentage
         }
         if percentage == 100:
-            data["eligible"] = True
+            data["eligiblility"] = True
         else:
-            data["eligible"] = False
+            data["eligibility"] = False
         return Response(data, status=status.HTTP_200_OK)
