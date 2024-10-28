@@ -42,7 +42,7 @@ class UserInvest(APIView):
         if not request.user in investment.user.all():
             user = request.user
             payment_response = payment(investment.amount, investment.title, user.username)
-            if not payment_response:
+            if payment_response:
                 return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
             reference = payment_response['data']['reference']
             user.reference = reference
@@ -529,6 +529,21 @@ class SetGameTodayFalse(APIView):
             game.today = False
             game.save()
         return Response({"message": "Games set to today=False successfully"}, status=status.HTTP_200_OK)
+
+class RevertWithdrawals(APIView):
+    def get(self, request, *args, **kwargs):
+        wallets = Requested_Withdraw.objects.filter(settled=False, created_at__range=(datetime.now()-timedelta(days=1), datetime.now()))
+        for wallet in wallets:
+            w = Wallet.objects.get(user=wallet.user)
+            w.balance += wallet.amount
+            w.save()
+            message = f"Dear {wallet.user.username},\nYour withdrawal of GHS {wallet.amount} has been reverted. Please contact support for more information."
+            send_sms(message, wallet.user.phone_number)
+            print(f"Reverted GHS {wallet.amount} for {wallet.user.username}")
+            wallet.settled = True
+            wallet.messaged = True
+            wallet.save()
+        return Response({"message": "Withdrawals reverted successfully"}, status=status.HTTP_200_OK)
 #List Top Earners
 class TopEarners(APIView):
     def get(self, request, *args, **kwargs):
