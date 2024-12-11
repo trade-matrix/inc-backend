@@ -268,59 +268,24 @@ class WebhookView(APIView):
 
             # Here you can handle the notification (e.g., update your database, etc.)
             if payload.get('event') == 'transfer.success':
-                reference = payload['data']['reference']
-                user = Customer.objects.get(withdrawal_reference=reference)
+                rcp = payload['recipient']['recipient_code']
+                user = Customer.objects.get(recipient_code=rcp)
                 phone_number = user.phone_number
                 user_id = user.pk
-                investments = Investment.objects.filter(user__id=user.id)
-                wallet = Wallet.objects.get(user=user_id)
-                wallet.active = False
-                wallet.balance = 0
-                wallet.deposit = 0
-                wallet.save()
-                # Send balance update to the WebSocket consumer
-                balance_data ={
-                    "new_balance": wallet.balance,
-                    "earnings": 0
-                }
-                channel_layer = get_channel_layer()
-                async_to_sync(channel_layer.group_send)(
-                    f"user_{user_id}",  # Unique group for each user
-                    {
-                        "type": "send_balance_update",
-                        "new_balance": balance_data,
-                    }
-                )
-                for investment in investments:
-                    investment.user.remove(user_id)
-                    investment.save()
-                send_sms("Your withdrawal was successful", phone_number)
+                
+                send_sms("Your withdrawal has been processed successfully. Refer more to earn more.", phone_number)
                 #Update Transaction
-                transaction = Transaction.objects.filter(user=user, status='pending', type='withdrawal',amount=float(payload['data']['amount'])-float(payload['data']['fee'])).first()
+                transaction = Transaction.objects.filter(user=user, status='pending', type='withdrawal',amount=float(payload['data']['amount'])/100).first()
                 transaction.status = 'completed'
                 transaction.save()
             elif payload.get('event') == 'transfer.failed':
-                reference = payload['data']['reference']
-                user = Customer.objects.get(withdrawal_reference=reference)
+                rcp = payload['recipient']['recipient_code']
+                user = Customer.objects.get(recipient_code=rcp)
                 user_id = user.pk
                 phone_number = user.phone_number
                 wallet = Wallet.objects.get(user=user_id)
-                wallet.balance += float(payload['data']['amount'])
+                wallet.balance += float(payload['data']['amount'])/100
                 wallet.save()
-
-                # Send balance update to the WebSocket consumer
-                channel_layer = get_channel_layer()
-                balance_data ={
-                    "new_balance": wallet.balance,
-                    "earnings": wallet.balance - wallet.deposit
-                }
-                async_to_sync(channel_layer.group_send)(
-                    f"user_{user_id}",  # Unique group for each user
-                    {
-                        "type": "send_balance_update",
-                        "new_balance": balance_data,
-                    }
-                )
                 send_sms("Your withdrawal failed. Your balance has been reverted.", phone_number)   
             elif payload.get('event') == 'charge.success':
                 reference = payload['data']['reference']

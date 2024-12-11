@@ -2,7 +2,7 @@ import requests
 import uuid
 import os
 from accounts.models import Customer
-from .models import Requested_Withdraw,Transaction,Investment, Wallet,Task
+from .models import Requested_Withdraw,Transaction,Investment, Wallet, Profit
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from datetime import datetime
@@ -283,14 +283,21 @@ def check_referrer_status(wallet, amount, reffered_wallet):
     tier_1 = 30
     tier_2 = 20
     tier_3 = 10
-    
+    profit = Profit.objects.get_or_create(name='profit')
     if reffered_wallet.tier == 1:
         wallet.balance += (amount)-(tier_1/5)
+        profit.amount_today += tier_1/5
+        profit.total_amount += tier_1/5
     elif reffered_wallet.tier == 2:
         wallet.balance += (amount)-(tier_2/4)
+        profit.amount_today += tier_2/4
+        profit.total_amount += tier_2/4
     elif reffered_wallet.tier == 3:
         wallet.balance += (amount)-(tier_3/2)
+        profit.amount_today += tier_3/2
+        profit.total_amount += tier_3/2
     wallet.save()
+    profit.save()
     return True
 
 def handle_payment(user, investment, wallet, amount):

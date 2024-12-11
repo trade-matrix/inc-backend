@@ -97,3 +97,10 @@ class Game(models.Model):
     today = models.BooleanField(default=False)
     def __str__(self):
         return self.name
+
+class Profit(models.Model):
+    name = models.CharField(max_length=255, default='Profit')
+    amount_today = models.FloatField()
+    total_amount = models.FloatField()
+    def __str__(self):
+        return self.total_amount
