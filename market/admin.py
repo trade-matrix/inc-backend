@@ -40,3 +40,7 @@ class GameAdmin(admin.ModelAdmin):
     search_fields = ['name', 'active']
     list_filter = ['name', 'created_at']
 admin.site.register(Game, GameAdmin)
+
+class ProfitAdmin(admin.ModelAdmin):
+    list_display = ['name', 'amount_today', 'total_amount',]
+admin.site.register(Profit, ProfitAdmin)
