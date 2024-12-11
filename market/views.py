@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer, Ref
-from .utils import send_sms, check_momo, payment, status_check, withdraw_optout, handle_payment, withdraw,paystack_payment, paystack_create_recipient
+from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 import json
