@@ -20,11 +20,26 @@ class Wallet(models.Model):
     deposit = models.FloatField(default=0.00)
     balance = models.FloatField(default=0.00)
     amount_from_games = models.FloatField(default=0.00)
+    deposit_used = models.BooleanField(default=False)
+    tier = models.IntegerField(default=1)
     eligible = models.BooleanField(default=False)
     active = models.BooleanField(default=False)
     date_made_eligible = models.DateTimeField(auto_now_add=False, blank=True, null=True)
     def __str__(self):
         return self.user.username
+
+class Task(models.Model):
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    allocated_tier_1_members = models.IntegerField()
+    allocated_tier_2_members = models.IntegerField()
+    allocated_tier_3_members = models.IntegerField()
+    tier_1_completed = models.BooleanField(default=False)
+    tier_2_completed = models.BooleanField(default=False)
+    tier_3_completed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    def __str__(self):
+        return self.title
 
 class Operator(models.Model):
     name = models.CharField(max_length=255)

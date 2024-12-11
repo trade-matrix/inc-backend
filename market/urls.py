@@ -17,4 +17,5 @@ urlpatterns = [
     path('alert/', AlertUsersonCompletedWithdrawal.as_view(), name='alert'),
     path('game/', GameView.as_view(), name='game'),
     path('off/today/', SetGameTodayFalse.as_view(), name='game-today'),
+    path('revert/', RevertWithdrawals.as_view(), name='revert'),
 ]

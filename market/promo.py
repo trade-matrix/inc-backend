@@ -2,9 +2,9 @@ def message_decider(message, customer, percentage):
     if message == 'news':
         return f"""
             Hello {customer.username},
-We are excited to inform you that Trade-Matrix now owns a telegram Channel. Join our channel to learn more on how your funds
-are being managed and to get the latest updates on our services.
-https://t.me/tradematrixnet
+Please informed that Trade-Matrix will undergo a massive maintenance in this week and as such all transactions, especially deposits may not work.
+Bear with us for this week as we are working hard to bring best services to all our cherished investors.
+Sorry for any inconvenience this may cause.
 The Trade-Matrix Team.
 """
     elif message == 'promo':

@@ -10,6 +10,7 @@ class Customer(AbstractUser):
     verified = models.BooleanField(default=False)
     reference = models.CharField(max_length=255, blank=True, null=True)
     referal_code = models.CharField(max_length=255, blank=True, null=True)
+    recepient_code = models.CharField(max_length=255, blank=True, null=True)
     withdrawal_reference = models.CharField(max_length=255, blank=True, null=True)
 
 class Ref(models.Model):

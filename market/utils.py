@@ -2,7 +2,7 @@ import requests
 import uuid
 import os
 from accounts.models import Customer
-from .models import Requested_Withdraw,Transaction,Investment, Wallet
+from .models import Requested_Withdraw,Transaction,Investment, Wallet,Task
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from datetime import datetime
@@ -98,7 +98,8 @@ def send_money(amount, phone_number, operator, user_id):
     else:
         print({"error": response.text, "status_code": response.status_code})
         return False
-    
+
+#Not a Kora Pay Function    
 def send_sms(message, number):
     url = "https://sms.arkesel.com/sms/api"
     params = {
@@ -169,7 +170,27 @@ def paystack_status_check(reference):
         print({"error": response.text, "status_code": response.status_code})
         return False
 
-def paystack_send_money(amount, phone_number, user_id):
+def paystack_create_recipient(name, account_number, bank_code):
+    url = 'https://api.paystack.co/transferrecipient'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {pay_stack_secret}'
+    }
+    data = {
+        "type": "mobile_money",
+        "name": name,
+        "account_number": account_number,
+        "bank_code": bank_code,
+        "currency": "GHS"
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 201:
+        return response.json()
+    else:
+        print({"error": response.text, "status_code": response.status_code})
+        return False
+
+def paystack_send_money(amount, phone_number, user_id, recipient_code):
     url = 'https://api.paystack.co/transfer'
     headers = {
         'Content-Type': 'application/json',
@@ -178,7 +199,7 @@ def paystack_send_money(amount, phone_number, user_id):
     data = {
         "source": "balance",
         "amount": amount*100,
-        "recipient": phone_number,
+        "recipient": recipient_code,
         "reason": "Transfer Payment",
         "reference": str(uuid.uuid4()),
         "metadata": {
@@ -192,7 +213,6 @@ def paystack_send_money(amount, phone_number, user_id):
     else:
         print({"error": response.text, "status_code": response.status_code})
         return False 
-
 
 #Important functions
 def withdraw_optout(user,wallet, amount, operator, phone_number):
@@ -236,6 +256,9 @@ def withdraw_optout(user,wallet, amount, operator, phone_number):
 
 def withdraw(user, wallet, amount, operator, phone_number):
     if wallet.balance >= float(amount):
+        send = paystack_send_money(float(amount), phone_number, user.id, user.recepient_code)
+        if not send:
+            return False
         Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
         send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
         wallet.balance -= float(amount)
@@ -250,17 +273,28 @@ def withdraw(user, wallet, amount, operator, phone_number):
                 "new_balance": wallet.balance,
             }
         )
-        #Send sms to notify admins
-        send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", "0599971083")
         #Create a transaction record
         Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
         return True
     else:
         return False
 
+def check_referrer_status(wallet, amount, reffered_wallet):
+    tier_1 = 30
+    tier_2 = 20
+    tier_3 = 10
+    
+    if reffered_wallet.tier == 1:
+        wallet.balance += (amount)-(tier_1/5)
+    elif reffered_wallet.tier == 2:
+        wallet.balance += (amount)-(tier_2/4)
+    elif reffered_wallet.tier == 3:
+        wallet.balance += (amount)-(tier_3/2)
+    wallet.save()
+    return True
+
 def handle_payment(user, investment, wallet, amount):
     if not user.referred_by:
-        wallet.balance += min((amount*(investment.interest)) + amount,1200)
         wallet.deposit += amount  # For example, adding a deposit
         # Update the wallet balance
         wallet.active = True
@@ -310,12 +344,18 @@ def handle_payment(user, investment, wallet, amount):
             }
         )
     elif user.referred_by:
-        wallet.balance += min(((amount*(investment.interest)) *0.5)+ amount,1200)
         wallet.deposit += amount  # For example, adding a deposit
         # Update the wallet balance
+        if amount == 15:
+            wallet.tier = 1
+        elif amount == 20:
+            wallet.tier = 2
+        elif amount == 30:
+            wallet.tier = 3
         wallet.active = True
         wallet.eligible = True
         wallet.date_made_eligible = datetime.now()
+        wallet.deposit_used = True
         wallet.save()
         # Create a transaction record
         transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
@@ -361,9 +401,9 @@ def handle_payment(user, investment, wallet, amount):
         )
         referrer_wallet,_ = Wallet.objects.get_or_create(user=user.referred_by)
         if referrer_wallet.user.verified:
-            referrer_wallet.balance += min((amount * investment.interest) * 0.5, 1200)
-            referrer_wallet.amount_from_games -= (amount*investment.interest)*0.5
-            referrer_wallet.save()
+            check = check_referrer_status(referrer_wallet, amount, wallet)
+            if not check:
+                return True
             try:
                 transaction = Transaction.objects.get(user=user.referred_by, status='pending', type='referal', reffered=user.username)
                 transaction.status = 'completed'
@@ -401,33 +441,23 @@ def handle_payment(user, investment, wallet, amount):
                 }
             )
 
-            send_sms(f"Dear customer,\nCongratulations your investment has been made successfuly. However, you are eligible to receive only 50% of your returns, as you were referred by {user.referred_by.username}. Refer more people to increase your earnings.", user.phone_number)
-            send_sms(f"Congratulations! You just earned 50% of {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
-        else:
-            wallet.balance += ((amount*(investment.interest)) + amount)*0.5
-            wallet.deposit += amount  # For example, adding a deposit
-            # Update the wallet balance
-            wallet.active = True
-            wallet.eligible = True
-            wallet.date_made_eligible = datetime.now()
-            wallet.save()
-            send_sms(f"Congratulations! Your investment has been made successfully. You can withdraw your returns after the target is reached.", user.phone_number)
+            send_sms(f"Dear customer,\nCongratulations, your investment has been made successfuly. Refer more people to increase your earnings.", user.phone_number)
+            send_sms(f"Congratulations! You just earned from {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
         return True
-    send_sms(f"Congratulations! Your investment has been made successfully. You can withdraw your returns after the target is reached.", user.phone_number)
+    send_sms(f"Congratulations! Your investment has been made successfully. Refer more people to increase your earnings.", user.phone_number)
     return True
 #Workers
 def worker():
    
-    customers = Customer.objects.filter(username='Khalebb')
+    customers = Customer.objects.all()
     
     for customer in customers:
         try:
-            message = message_decider('opened', customer, 10)
+            message = message_decider('news', customer, 10)
             send_sms(message, customer.phone_number)
             print(f'Sent message to {customer.username}')
         except Exception as e:
             print(f'Error sending message to {customer.phone_number}: {e}')
-
 
 def send_promo_sms(user):
     message = message_decider('news', user, 10)

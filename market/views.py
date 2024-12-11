@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer, Ref
-from .utils import send_sms, check_momo, payment, status_check, withdraw_optout, handle_payment, withdraw
+from .utils import send_sms, check_momo, payment, status_check, withdraw_optout, handle_payment, withdraw,paystack_payment, paystack_create_recipient
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 import json
@@ -41,17 +41,22 @@ class UserInvest(APIView):
         investment = Investment.objects.get(pk=pk)
         if not request.user in investment.user.all():
             user = request.user
-            payment_response = payment(investment.amount, investment.title, user.username)
-            if payment_response:
-                return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
-            reference = payment_response['data']['reference']
-            user.reference = reference
-            user.save()
-            Ref.objects.create(reference=reference, user=user)
-            data = {
-                "payment_response": payment_response,
-            }
-            return Response(data, status=status.HTTP_200_OK)
+            # Check if the user has already invested in another firm
+            existing_investments = Investment.objects.filter(user=user)
+            if not existing_investments.exists():
+                payment_response = paystack_payment(investment.amount, investment.title, user.username)
+                if 'error' in payment_response:
+                    return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
+                reference = payment_response['data']['reference']
+                user.reference = reference
+                user.save()
+                Ref.objects.create(reference=reference, user=user)
+                data = {
+                    "payment_response": payment_response,
+                }
+                return Response(data, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "User has already invested in another firm"}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"error": "User has Already Invested In this firm"}, status=status.HTTP_400_BAD_REQUEST)
 
 class VerifyPayment(APIView):
@@ -223,58 +228,37 @@ class WithdrawfromWallet(APIView):
         amount = request.data.get('amount')
         operator = request.data.get('operator')
         phone_number = request.data.get('phone_number')
+        if 'mtn' in operator.lower():
+            opr = 'MTN'
+        elif 'vodafone' in operator.lower():
+            opr = 'VOD'
+        elif 'airtel' in operator.lower():
+            opr = 'ATL'      
+        rcp = paystack_create_recipient(user.username, phone_number, opr)
         #withdarw = withdraw_optout(user,wallet, amount, operator, phone_number)
-        withdarw = withdraw(user, wallet, amount, operator, phone_number)
-        if withdarw:
-            return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
-        return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
-    #Get method to get avilable deposit amounts for withdrawal based on user investment
+        if rcp:
+            if not user.recepient_code:
+                recipient_code = rcp['data']['recipient_code']
+                user.recepient_code = recipient_code
+                user.save()
+            withdarw = withdraw(user, wallet, amount, operator, phone_number)
+            if withdarw:
+                return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
+            return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Withdrawal failed"}, status=status.HTTP_400_BAD_REQUEST)
+    #Get method to get avilable user amount for withdrawal
     def get(self, request, *args, **kwargs):
         user = request.user
         wallet = Wallet.objects.get(user=user)
-        # investments = Investment.objects.filter(user__id=user.id)
-        
-        selected_wallets = []
-        
-        # Step 1: Filter wallets with deposit=15 and balance > 100, limit to 3 results
-        selected_users = Wallet.objects.filter(deposit=15, balance__gt=100)[:3]
-        selected_wallets.extend(selected_users)
-        
-        # Step 2: Filter wallets by specific usernames
-        selected_usernames = ['DeAgusco', 'Khalebb']
-        selected_wallets.extend(Wallet.objects.filter(user__username__in=selected_usernames))
-        
+        #investments = Investment.objects.filter(user__id=user.id)
         data = []
-        for wallet in selected_wallets:
-            #check if the wallet belongs to the selected user
-            if wallet.user == user:
-                if wallet.balance > 10 and wallet.date_made_eligible + timedelta(days=1) < timezone.now():
-                    if wallet.balance < 251:
-                        data.append({
-                            "amount1": wallet.balance
-                        })
-                    else:
-                        data.append({
-                            "amount1": 250
-                        })
-        if data:
-            return Response(data, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
-    """
-    def get(self, request, *args, **kwargs):
-        user = request.user
-        wallet = Wallet.objects.get(user=user)
-        investments = Investment.objects.filter(user__id=user.id)
-        data = []
-        if wallet.deposit and wallet.date_made_eligible + timedelta(days=5) >= timezone.now():
-            for investment in investments:
-                data.append({
-                    f"amount{investment.pk}": investment.amount
-                })
+        if wallet.deposit and wallet.balance:
+            data.append({
+                f"amount1": wallet.balance
+            })
             return Response(data, status=status.HTTP_200_OK)
         return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
-    """
+    
 @method_decorator(csrf_exempt, name='dispatch')
 class WebhookView(APIView):
     def post(self, request, *args, **kwargs):
