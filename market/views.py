@@ -243,7 +243,11 @@ class WithdrawfromWallet(APIView):
                 user.save()
             withdarw = withdraw(user, wallet, amount, operator, phone_number)
             if withdarw:
-                return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
+                try:
+                    wit = withdarw['error']['message']
+                    return Response({"message": wit}, status=status.HTTP_200_OK)
+                except:
+                    return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
             return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"error": "Withdrawal failed"}, status=status.HTTP_400_BAD_REQUEST)
     #Get method to get avilable user amount for withdrawal

@@ -211,8 +211,7 @@ def paystack_send_money(amount, phone_number, user_id, recipient_code):
     if response.status_code == 200:
         return response.json()
     else:
-        print({"error": response.text, "status_code": response.status_code})
-        return False 
+        return response.text 
 
 #Important functions
 def withdraw_optout(user,wallet, amount, operator, phone_number):
@@ -257,9 +256,8 @@ def withdraw_optout(user,wallet, amount, operator, phone_number):
 def withdraw(user, wallet, amount, operator, phone_number):
     if wallet.balance >= float(amount):
         send = paystack_send_money(float(amount), phone_number, user.id, user.recepient_code)
-        print(send)
         if not send:
-            return False
+            return send
         Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
         send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
         wallet.balance -= float(amount)
