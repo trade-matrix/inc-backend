@@ -257,6 +257,7 @@ def withdraw_optout(user,wallet, amount, operator, phone_number):
 def withdraw(user, wallet, amount, operator, phone_number):
     if wallet.balance >= float(amount):
         send = paystack_send_money(float(amount), phone_number, user.id, user.recepient_code)
+        print(send)
         if not send:
             return False
         Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
