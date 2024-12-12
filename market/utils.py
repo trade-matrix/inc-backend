@@ -211,7 +211,8 @@ def paystack_send_money(amount, phone_number, user_id, recipient_code):
     if response.status_code == 200:
         return response.json()
     else:
-        return response.text 
+        print({"error": response.text, "status_code": response.status_code})
+        return False
 
 #Important functions
 def withdraw_optout(user,wallet, amount, operator, phone_number):
