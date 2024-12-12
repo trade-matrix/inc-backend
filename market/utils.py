@@ -283,7 +283,7 @@ def check_referrer_status(wallet, amount, reffered_wallet):
     tier_1 = 30
     tier_2 = 20
     tier_3 = 10
-    profit = Profit.objects.get_or_create(name='profit')
+    profit,_ = Profit.objects.get_or_create(name='profit')
     if reffered_wallet.tier == 1:
         wallet.balance += (amount)-(tier_1/5)
         profit.amount_today += tier_1/5
