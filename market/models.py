@@ -103,4 +103,4 @@ class Profit(models.Model):
     amount_today = models.FloatField()
     total_amount = models.FloatField()
     def __str__(self):
-        return self.total_amount
+        return self.name
