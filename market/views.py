@@ -296,7 +296,7 @@ class WebhookView(APIView):
                 except Customer.DoesNotExist:
                     ref = Ref.objects.get(reference=reference)
                     user = ref.user
-                amount = float(payload['data']['amount'])-float(payload['data']['fee'])
+                amount = float(payload['data']['amount'])/100
                 investment = Investment.objects.get(amount=amount)
                 wallet,_ = Wallet.objects.get_or_create(user=user)
                 # Update the wallet balance
