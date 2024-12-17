@@ -272,7 +272,7 @@ class WebhookView(APIView):
 
             # Here you can handle the notification (e.g., update your database, etc.)
             if payload.get('event') == 'transfer.success':
-                rcp = payload['recipient']['recipient_code']
+                rcp = payload['data']['recipient']['recipient_code']
                 user = Customer.objects.get(recipient_code=rcp)
                 phone_number = user.phone_number
                 user_id = user.pk
@@ -283,7 +283,7 @@ class WebhookView(APIView):
                 transaction.status = 'completed'
                 transaction.save()
             elif payload.get('event') == 'transfer.failed':
-                rcp = payload['recipient']['recipient_code']
+                rcp = payload['data']['recipient']['recipient_code']
                 user = Customer.objects.get(recipient_code=rcp)
                 user_id = user.pk
                 phone_number = user.phone_number
