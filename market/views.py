@@ -256,7 +256,7 @@ class WithdrawfromWallet(APIView):
         wallet = Wallet.objects.get(user=user)
         #investments = Investment.objects.filter(user__id=user.id)
         data = []
-        if wallet.deposit and wallet.balance:
+        if wallet.deposit and wallet.balance > 0:
             data.append({
                 f"amount1": wallet.balance
             })
@@ -276,8 +276,6 @@ class WebhookView(APIView):
                 user = Customer.objects.get(recipient_code=rcp)
                 phone_number = user.phone_number
                 user_id = user.pk
-                
-                send_sms("Your withdrawal has been processed successfully. Refer more to earn more.", phone_number)
                 #Update Transaction
                 transaction = Transaction.objects.filter(user=user, status='pending', type='withdrawal',amount=float(payload['data']['amount'])/100).first()
                 transaction.status = 'completed'
