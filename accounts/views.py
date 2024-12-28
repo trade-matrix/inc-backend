@@ -212,7 +212,7 @@ class UserDetails(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         user = request.user
         walet, _ = Wallet.objects.get_or_create(user=user)
-        earnings = walet.balance-walet.deposit
+        earnings = walet.amount_from_games
         number_of_investments = Investment.objects.filter(user=user).count()
         number_of_refferals = Transaction.objects.filter(user=user, type='referal',status='completed').count()
         eligibility = walet.eligible
