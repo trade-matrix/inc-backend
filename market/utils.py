@@ -262,10 +262,12 @@ def withdraw(user, wallet, amount, operator, phone_number):
             send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
             amin_phone = "0599971083"
             send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", amin_phone)
+            return True
         else:
             send_sms("Your withdrawal has been processed successfully. Refer more to earn more.", user.phone_number)
         wallet.balance -= float(amount)
         wallet.balance = max(wallet.balance, 0)
+        wallet.amount_from_games += float(amount)
         wallet.save()
         # Send balance update to the WebSocket consumer
         channel_layer = get_channel_layer()

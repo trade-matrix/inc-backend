@@ -247,8 +247,6 @@ class WithdrawfromWallet(APIView):
                     wit = withdarw['error']['message']
                     return Response({"message": wit}, status=status.HTTP_200_OK)
                 except:
-                    wallet.amount_from_games += float(amount)
-                    wallet.save()
                     return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
             return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"error": "Withdrawal failed"}, status=status.HTTP_400_BAD_REQUEST)
