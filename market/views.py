@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer, Ref
-from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient
+from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 import json
@@ -247,6 +247,8 @@ class WithdrawfromWallet(APIView):
                     wit = withdarw['error']['message']
                     return Response({"message": wit}, status=status.HTTP_200_OK)
                 except:
+                    wallet.amount_from_games += float(amount)
+                    wallet.save()
                     return Response({"message": "Withdrawal successful"}, status=status.HTTP_200_OK)
             return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"error": "Withdrawal failed"}, status=status.HTTP_400_BAD_REQUEST)
@@ -466,9 +468,18 @@ class IncreaseBalance(APIView):
 
 class AlertUsersonCompletedWithdrawal(APIView):
     def get(self, request, *args, **kwargs):
-        wallets = Requested_Withdraw.objects.filter(settled=True, messaged=False)
+        wallets = Requested_Withdraw.objects.filter(settled=False, messaged=False)
         for wallet in wallets:
-            send_sms(f"Dear {wallet.user.username},\nCongratulations your withdrawal of GHS {wallet.amount} has been processed successfully. Thank you for your patience.", wallet.user.phone_number)
+            user = wallet.user
+            w = Wallet.objects.get(user=user)
+            send = paystack_send_money(wallet.amount, wallet.phone_number, user.pk, user.recepient_code)
+            if send:
+                wallet.settled = True
+                w.amount_from_games += wallet.amount
+                w.balance -= wallet.amount
+                w.save()
+                wallet.save()
+                send_sms(f"Dear {user.username},\nCongratulations, your withdrawal of GHS {wallet.amount} has been processed successfully. Thank you for your patience.", user.phone_number)
             wallet.messaged = True
             wallet.save()
         return Response({"message": "Alerts sent successfully"}, status=status.HTTP_200_OK)

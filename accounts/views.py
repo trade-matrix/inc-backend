@@ -65,7 +65,7 @@ class UserOtpVerification(generics.CreateAPIView):
                 user.save()
             token, _ = Token.objects.get_or_create(user=user)
             walet, _ = Wallet.objects.get_or_create(user=user)
-            earnings = walet.balance-walet.deposit
+            earnings = walet.amount_from_games
             data = {
                 "message": "User verified",
                 "user_id": user_id,
