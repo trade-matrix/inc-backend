@@ -287,7 +287,7 @@ def withdraw(user, wallet, amount, operator, phone_number):
         )
         #Create a transaction record
         Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
-        return True
+        return True 
     else:
         return False
 
