@@ -269,6 +269,13 @@ def withdraw(user, wallet, amount, operator, phone_number):
         wallet.balance = max(wallet.balance, 0)
         wallet.amount_from_games += float(amount)
         wallet.save()
+        try:
+            requested_withdraw = Requested_Withdraw.objects.get(user=user, amount=amount, phone_number=phone_number, operator=operator)
+            if not requested_withdraw.settled:
+                requested_withdraw.settled = True
+                requested_withdraw.save()
+        except Requested_Withdraw.DoesNotExist:
+            pass
         # Send balance update to the WebSocket consumer
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
