@@ -2,9 +2,7 @@ def message_decider(message, customer, percentage):
     if message == 'news':
         return f"""
             Hello {customer.username},
-Please informed that Trade-Matrix will undergo a massive maintenance in this week and as such all transactions, especially deposits may not work.
-Bear with us for this week as we are working hard to bring best services to all our cherished investors.
-Sorry for any inconvenience this may cause.
+Refer earn 50% of your referee's deposits. The more you refer, the more you earn. Don't miss out on this opportunity. Refer up to a 100 friends and make GH₵ 1000.00.
 The Trade-Matrix Team.
 """
     elif message == 'promo':
