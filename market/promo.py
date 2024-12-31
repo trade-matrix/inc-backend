@@ -2,7 +2,7 @@ def message_decider(message, customer, percentage):
     if message == 'news':
         return f"""
             Hello {customer.username},
-Refer earn 50% of your referee's deposits. The more you refer, the more you earn. Don't miss out on this opportunity. Refer up to a 100 friends and make GH₵ 1000.00.
+Refer and earn 50% of your referee's deposits. The more you refer, the more you earn. Don't miss out on this opportunity. Refer up to a 100 friends and make GH₵ 1000.00.
 The Trade-Matrix Team.
 """
     elif message == 'promo':
