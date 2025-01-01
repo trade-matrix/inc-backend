@@ -1,6 +1,6 @@
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from .serializers import UserLoginSerializer, UserRegistrationSerializer, UserOtpVerificationSerializer, UserResendOtpSerializer, InvestmentSerializer, ReferredUserSerializer
+from .serializers import UserLoginSerializer, UserRegistrationSerializer, UserOtpVerificationSerializer, UserResendOtpSerializer, InvestmentSerializer, ReferredUserSerializer, GCRegisterationSerializer, GCLoginSerializer
 from .models import Customer
 import os
 from rest_framework.authentication import TokenAuthentication,SessionAuthentication
@@ -12,7 +12,7 @@ from .exceptions import ExternalAPIError
 import requests
 from market.models import Wallet, Investment, Transaction
 from .utils import send_otp
-from market.utils import send_promo_sms
+from market.utils import send_promo_sms, update_user
 
 class UserRegistrationView(generics.CreateAPIView):
     queryset = Customer.objects.all()
@@ -95,9 +95,18 @@ class UserLoginView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         phone_number = serializer.validated_data['phone_number']
+        platform = serializer.validated_data['platform']
         try:
             user = Customer.objects.get(phone_number=phone_number)
         except Customer.DoesNotExist:
+            if platform == 'Gc':
+                user = Customer.objects.create_user(username="investor", phone_number=phone_number)
+                send_otp(user.phone_number, user.username)
+                data = {
+                    "message": "OTP sent",
+                    "user_id": user.id
+                }
+                return Response(data, status=status.HTTP_200_OK)
             raise AuthenticationFailed(detail="Invalid Phone Number")
 
         send_otp(user.phone_number, user.username)
@@ -273,3 +282,82 @@ class NumberofReferralsRequired(generics.GenericAPIView):
         else:
             data["eligibility"] = False
         return Response(data, status=status.HTTP_200_OK)
+
+class RegisteronGoldenCash(generics.CreateAPIView):
+    queryset = Customer.objects.all()
+    serializer_class = GCRegisterationSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            response = super().post(request, *args, **kwargs)
+            if response.status_code == status.HTTP_201_CREATED:
+                user = Customer.objects.get(username=request.data['username'])
+                token, _ = Token.objects.get_or_create(user=user)
+                walet, _ = Wallet.objects.get_or_create(user=user)
+                earnings = walet.amount_from_games
+                update_user(user.email, "Welcome","Welcome to Golden Cash",'new.html')
+                data = {
+                    "message": "User verified",
+                    "user_id": user.id,
+                    "username": user.username,
+                    "phone_number": user.phone_number,
+                    "verified": user.verified,
+                    "token": token.key,
+                    "balance": walet.balance,
+                    "earnings": earnings,
+                    "deposit": walet.deposit,
+                }
+                login(request, user)
+                return Response(data, status=status.HTTP_201_CREATED)
+            return response
+        except Customer.DoesNotExist:
+            return Response(
+                {"error": "User creation failed"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except ExternalAPIError as e:
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+
+class UserLoginGoldenCash(generics.CreateAPIView):
+    serializer_class = GCLoginSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+        
+        try:
+            user = Customer.objects.get(email=email)
+        except Customer.DoesNotExist:
+            raise AuthenticationFailed(detail="Invalid Email")
+        
+        if not user.check_password(password):
+            raise AuthenticationFailed(detail="Invalid Password")
+        
+        if not user.is_active:
+            raise AuthenticationFailed(detail="Account not activated")
+        
+        token, _ = Token.objects.get_or_create(user=user)
+        walet, _ = Wallet.objects.get_or_create(user=user)
+        earnings = walet.amount_from_games
+        data = {
+            "message": "User verified",
+            "user_id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "verified": user.verified,
+            "token": token.key,
+            "balance": walet.balance,
+            "earnings": earnings,
+            "deposit": walet.deposit,
+        }
+        login(request, user)
+
+        return Response(data, status=200)
+    

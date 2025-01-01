@@ -14,4 +14,6 @@ urlpatterns = [
     path('details/', UserDetails.as_view(), name='details'),
     path('delete/', DeleteAccount.as_view(), name='delete'),
     path('check-referal/', NumberofReferralsRequired.as_view(), name='check-referal'),
+    path('register/gc/', RegisteronGoldenCash.as_view(), name='register-gc'),
+    path('login/gc/', UserLoginGoldenCash.as_view(), name='login-gc'),
 ]

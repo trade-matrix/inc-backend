@@ -61,7 +61,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -93,6 +93,11 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -170,7 +175,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",'https://trade-matrix.vercel.app','https://trade-matrix.net','https://www.trade-matrix.net/','https://trade-matrix-em5hasvxk-derricks-projects-71562c49.vercel.app/'
 ]
-ORS_ALLOW_METHODS = [
+CORS_ALLOW_METHODS = [
     "GET",
     "POST",
     "PUT",
@@ -188,3 +193,6 @@ CORS_ALLOW_HEADERS = [
     "Access-Control-Allow-Headers",
     "Access-Control-Allow-Origin" # Add the CSRF token header
 ]
+
+#Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

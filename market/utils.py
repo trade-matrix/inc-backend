@@ -7,6 +7,8 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from datetime import datetime
 from .promo import message_decider
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
 
 secret = os.environ.get('Kora_Secret_Key')
 pay_stack_secret = os.environ.get('pay_stack_secret')
@@ -116,6 +118,17 @@ def send_sms(message, number):
         print(response.text)
     except requests.exceptions.RequestException as e:
         print("An error occurred:", e)
+
+def update_user(email,sub, context, template):
+    from_email = "support@goldencash.live"
+    to_email = email
+    subject = sub
+    text_content = context
+    html_content = render_to_string(template)
+
+    msg = EmailMultiAlternatives(subject, text_content, from_email, [to_email])
+    msg.attach_alternative(html_content, 'text/html')
+    msg.send()
 
 def check_momo(phone_number, operator):
     url = 'https://api.korapay.com/merchant/api/v1/misc/mobile-money/resolve'
@@ -265,6 +278,7 @@ def withdraw(user, wallet, amount, operator, phone_number):
             return True
         else:
             send_sms("Your withdrawal has been processed successfully. Refer more to earn more.", user.phone_number)
+            update_user(user.email, "Congratulations", "Congratulations! Your withdrawal has been processed successfully.", "withdraw_s.html")
         wallet.balance -= float(amount)
         wallet.balance = max(wallet.balance, 0)
         wallet.amount_from_games += float(amount)
@@ -292,7 +306,10 @@ def withdraw(user, wallet, amount, operator, phone_number):
         return False
 
 def check_referrer_status(wallet, amount, reffered_wallet):
-    profit,_ = Profit.objects.get_or_create(name='profit')
+    if amount > 30:
+        profit,_ = Profit.objects.get_or_create(name='gc')
+    else:
+        profit,_ = Profit.objects.get_or_create(name='profit')
     wallet.balance += (amount/2)
     profit.amount_today += amount/2
     profit.total_amount += amount/2
@@ -448,11 +465,15 @@ def handle_payment(user, investment, wallet, amount):
                 }
             )
 
-            send_sms(f"Dear customer,\nCongratulations, your investment has been made successfuly. Refer more people to increase your earnings.", user.phone_number)
-            send_sms(f"Congratulations! You just earned from {user.username}'s investment.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
+            send_sms(f"Dear customer,\nCongratulations, your deposit has been processed successfuly. Refer people to increase your earnings.", user.phone_number)
+            update_user(user.email, "Congratulations", "Congratulations! Your deposit has been processed successfully.", "payment.html")
+            send_sms(f"Congratulations! You just earned from {user.username}'s deposit.\nYour total balance is now GHS {referrer_wallet.balance}", user.referred_by.phone_number)
+            update_user(user.referred_by.email, "Congratulations", f"Congratulations! You just earned from {user.username}'s deposit.", "referal.html")
         return True
-    send_sms(f"Congratulations! Your investment has been made successfully. Refer more people to increase your earnings.", user.phone_number)
+    send_sms(f"Congratulations! Your deposit has been processed successfully. Refer people to increase your earnings.", user.phone_number)
+    update_user(user.email, "Congratulations", "Congratulations! Your deposit has been processed successfully.", "payment.html")
     return True
+
 #Workers
 def worker():
    
@@ -470,3 +491,4 @@ def send_promo_sms(user):
     message = message_decider('news', user, 10)
     send_sms(message, user.phone_number)
     print(f'Sent message to {user.phone_number}')
+
