@@ -134,7 +134,11 @@ class GCRegisterationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Validate the username
         validated_data['username'] = self.validate_username(validated_data.get('username', ''))
-
+        try:
+            Customer.objects.get(email=validated_data.get('email'))
+            raise serializers.ValidationError('User with this email already exists')
+        except Customer.DoesNotExist:
+            pass
         # Generate unique phone number
         while True:
             phone_number = str(random.randint(100000000, 999999999))
