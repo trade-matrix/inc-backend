@@ -180,9 +180,11 @@ class UserCreateReferalLink(generics.GenericAPIView):
     authentication_classes = [TokenAuthentication,SessionAuthentication]
     def get(self, request, *args, **kwargs):
         if not request.user.verified:
-            return Response({"message": "Investment required before you can refer."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Deposit required before you can refer."}, status=status.HTTP_400_BAD_REQUEST)
         user = request.user
-        referal_link = f"https://trade-matrix.net/auth/sign-up/?referral={user.username}"
+        if not user.email:
+            referal_link = f"https://trade-matrix.net/auth/sign-up/?referral={user.username}"
+        referal_link = f"https://goldencash.live/auth/sign-up/?referral={user.username}"
         data = {
             "referal_link": referal_link,
             "message": "Referal link created successfully"

@@ -507,12 +507,12 @@ class RevertWithdrawals(APIView):
 #List Top Earners
 class TopEarners(APIView):
     def get(self, request, *args, **kwargs):
-        wallets = Wallet.objects.all().order_by('-balance')[:5]
+        wallets = Wallet.objects.all().order_by('-amount_from_games')[:5]
         data = []
         for wallet in wallets:
             data.append({
                 "username": wallet.user.username,
-                "balance": wallet.balance,
+                "balance": wallet.amount_from_games,
                 "deposit": wallet.deposit
             })
         return Response(data, status=status.HTTP_200_OK)
@@ -599,3 +599,15 @@ class GameView(APIView):
                 game_status[game.name].pop("timestamp", None)
 
         return Response(game_status, status=status.HTTP_200_OK)
+
+class TopEarnersGc(APIView):
+    def get(self, request, *args, **kwargs):
+        wallets = Wallet.objects.filter(user__email__isnull=False).order_by('-amount_from_games')[:5]
+        data = []
+        for wallet in wallets:
+            data.append({
+                "username": wallet.user.username,
+                "balance": wallet.amount_from_games,
+                "deposit": wallet.deposit,
+            })
+        return Response(data, status=status.HTTP_200_OK)
