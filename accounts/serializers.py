@@ -16,8 +16,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         fields = ('username', 'phone_number', 'referal_code')
     
     def validate_username(self, value):
-        # Replace spaces in the username with underscores
-        return value.replace(' ', '_')
+        # Remove all whitespace and special characters, keeping only alphanumeric and underscore
+        cleaned_username = ''.join(char for char in value if char.isalnum() or char == '_')
+        if not cleaned_username:
+            raise serializers.ValidationError("Username must contain at least one alphanumeric character")
+        return cleaned_username
+
+    def validate(self, data):
+        if 'username' in data:
+            data['username'] = self.validate_username(data['username'])
+        return data
 
     def create(self, validated_data):
         # Validate the username
@@ -128,8 +136,16 @@ class GCRegisterationSerializer(serializers.ModelSerializer):
         fields = ('username', 'email', 'referal_code', 'password')
     
     def validate_username(self, value):
-        # Replace spaces in the username with underscores
-        return value.replace(' ', '_')
+        # Remove all whitespace and special characters, keeping only alphanumeric and underscore
+        cleaned_username = ''.join(char for char in value if char.isalnum() or char == '_')
+        if not cleaned_username:
+            raise serializers.ValidationError("Username must contain at least one alphanumeric character")
+        return cleaned_username
+
+    def validate(self, data):
+        if 'username' in data:
+            data['username'] = self.validate_username(data['username'])
+        return data
 
     def create(self, validated_data):
         # Validate the username
