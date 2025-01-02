@@ -602,7 +602,11 @@ class GameView(APIView):
 
 class TopEarnersGc(APIView):
     def get(self, request, *args, **kwargs):
-        wallets = Wallet.objects.filter(user__email__isnull=False).order_by('-amount_from_games')[:5]
+        wallets = Wallet.objects.filter(
+            user__email__isnull=False,  # Ensure email is not null
+            user__email__gt=''  # Ensure email is not empty string
+        ).order_by('-amount_from_games')[:5]
+        
         data = []
         for wallet in wallets:
             data.append({
