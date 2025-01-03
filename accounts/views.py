@@ -182,7 +182,7 @@ class UserCreateReferalLink(generics.GenericAPIView):
         if not request.user.verified:
             return Response({"message": "Deposit required before you can refer."}, status=status.HTTP_400_BAD_REQUEST)
         user = request.user
-        if not user.email:
+        if user.email == '':
             referal_link = f"https://trade-matrix.net/auth/sign-up/?referral={user.username}"
         referal_link = f"https://goldencash.vercel.app/auth/sign-up/?referral={user.username}"
         data = {

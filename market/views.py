@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone  # Use Django's timezone utility
 #pagination
 from rest_framework.pagination import PageNumberPagination
+from django.db.models import Q
 
 class InvestmentListView(generics.ListAPIView):
     queryset = Investment.objects.all()
@@ -507,7 +508,10 @@ class RevertWithdrawals(APIView):
 #List Top Earners
 class TopEarners(APIView):
     def get(self, request, *args, **kwargs):
-        wallets = Wallet.objects.all().order_by('-amount_from_games')[:5]
+        wallets = Wallet.objects.filter(
+            Q(user__email__isnull=True) | Q(user__email='')
+        ).order_by('-amount_from_games')[:5]
+        
         data = []
         for wallet in wallets:
             data.append({
