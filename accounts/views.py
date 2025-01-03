@@ -191,7 +191,7 @@ class UserCreateReferalLink(generics.GenericAPIView):
         if user.email is None or user.email.strip() == '':
             referal_link = f"https://trade-matrix.net/auth/sign-up/?referral={user.username}"
         else:
-            referal_link = f"https://goldencash.vercel.app/auth/sign-up/?referral={user.username}"
+            referal_link = f"https://goldencash.live/auth/sign-up/?referral={user.username}"
             
         data = {
             "referal_link": referal_link,
