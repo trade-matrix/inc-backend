@@ -16,8 +16,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         fields = ('username', 'phone_number', 'referal_code')
     
     def validate_username(self, value):
-        # Remove all whitespace and special characters, keeping only alphanumeric and underscore
-        cleaned_username = ''.join(char for char in value if char.isalnum() or char == '_')
+        # First remove all whitespace
+        value = ''.join(value.split())
+        # Then remove any remaining special characters
+        cleaned_username = ''.join(char.lower() for char in value if char.isalnum() or char == '_')
         if not cleaned_username:
             raise serializers.ValidationError("Username must contain at least one alphanumeric character")
         return cleaned_username
@@ -28,7 +30,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        # Validate the username
+        # Double-check username sanitization before creation
         validated_data['username'] = self.validate_username(validated_data.get('username', ''))
 
         password = "defaultpassword"
@@ -136,8 +138,10 @@ class GCRegisterationSerializer(serializers.ModelSerializer):
         fields = ('username', 'email', 'referal_code', 'password')
     
     def validate_username(self, value):
-        # Remove all whitespace and special characters, keeping only alphanumeric and underscore
-        cleaned_username = ''.join(char for char in value if char.isalnum() or char == '_')
+        # First remove all whitespace
+        value = ''.join(value.split())
+        # Then remove any remaining special characters
+        cleaned_username = ''.join(char.lower() for char in value if char.isalnum() or char == '_')
         if not cleaned_username:
             raise serializers.ValidationError("Username must contain at least one alphanumeric character")
         return cleaned_username
@@ -148,7 +152,7 @@ class GCRegisterationSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        # Validate the username
+        # Double-check username sanitization before creation
         validated_data['username'] = self.validate_username(validated_data.get('username', ''))
         try:
             Customer.objects.get(email=validated_data.get('email'))
@@ -160,7 +164,7 @@ class GCRegisterationSerializer(serializers.ModelSerializer):
             phone_number = str(random.randint(100000000, 999999999))
             if not Customer.objects.filter(phone_number=phone_number).exists():
                 break
-        
+        print(**validated_data)
         validated_data['phone_number'] = phone_number
         # The username will already have been sanitized by validate_username
         user = Customer.objects.create(**validated_data)
