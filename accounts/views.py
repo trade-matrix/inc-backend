@@ -177,15 +177,22 @@ class TotalNumberOfUsers(generics.GenericAPIView):
     
 class UserCreateReferalLink(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [TokenAuthentication,SessionAuthentication]
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    
     def get(self, request, *args, **kwargs):
         if not request.user.verified:
-            return Response({"message": "Deposit required before you can refer."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"message": "Deposit required before you can refer."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         user = request.user
-        if user.email == '':
+        # Check for both null and empty email
+        if user.email is None or user.email.strip() == '':
             referal_link = f"https://trade-matrix.net/auth/sign-up/?referral={user.username}"
         else:
             referal_link = f"https://goldencash.vercel.app/auth/sign-up/?referral={user.username}"
+            
         data = {
             "referal_link": referal_link,
             "message": "Referal link created successfully"
