@@ -227,6 +227,19 @@ def paystack_send_money(amount, phone_number, user_id, recipient_code):
         print({"error": response.text, "status_code": response.status_code})
         return False
 
+def paystack_balance_check():
+    url = 'https://api.paystack.co/balance'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {pay_stack_secret}'
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print({"error": response.text, "status_code": response.status_code})
+        return False
+
 #Important functions
 def withdraw_optout(user,wallet, amount, operator, phone_number):
     if wallet.deposit >= float(amount):

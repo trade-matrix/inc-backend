@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer, Ref
-from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money
+from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 import json
@@ -256,11 +256,15 @@ class WithdrawfromWallet(APIView):
         user = request.user
         wallet = Wallet.objects.get(user=user)
         #investments = Investment.objects.filter(user__id=user.id)
+        balance = paystack_balance_check()
         data = []
+        
         if wallet.deposit and wallet.balance > 0:
             data.append({
                 f"amount1": wallet.balance
             })
+            if not balance['data']['balance'] > wallet.balance:
+                return Response(data, status=status.HTTP_400_BAD_REQUEST)
             return Response(data, status=status.HTTP_200_OK)
         return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
     
