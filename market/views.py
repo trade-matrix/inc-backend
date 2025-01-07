@@ -260,7 +260,7 @@ class WithdrawfromWallet(APIView):
         try:
             balance = balance['data']['balance']
         except:
-            return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": balance}, status=status.HTTP_400_BAD_REQUEST)
         data = []
         
         if wallet.deposit and wallet.balance > 0:
