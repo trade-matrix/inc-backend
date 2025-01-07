@@ -258,9 +258,13 @@ class WithdrawfromWallet(APIView):
         #investments = Investment.objects.filter(user__id=user.id)
         balance = paystack_balance_check()
         try:
-            b = balance['data']['balance']/100
+            # Check if balance is a successful response with the expected structure
+            if isinstance(balance, dict) and balance.get('status') and balance.get('message') == "Balances retrieved":
+                b = balance['data'][0]['balance']/100
+            else:
+                return Response({"error": "Could not retrieve balance"}, status=status.HTTP_400_BAD_REQUEST)
         except:
-            return Response({"error": balance}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Could not retrieve balance"}, status=status.HTTP_400_BAD_REQUEST)
         data = []
         
         if wallet.deposit and wallet.balance > 0:
