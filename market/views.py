@@ -257,13 +257,17 @@ class WithdrawfromWallet(APIView):
         wallet = Wallet.objects.get(user=user)
         #investments = Investment.objects.filter(user__id=user.id)
         balance = paystack_balance_check()
+        try:
+            balance = balance['data']['balance']
+        except:
+            return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
         data = []
         
         if wallet.deposit and wallet.balance > 0:
             data.append({
                 f"amount1": wallet.balance
             })
-            if not balance['data']['balance'] > wallet.balance:
+            if not float(balance) > wallet.balance:
                 return Response(data, status=status.HTTP_400_BAD_REQUEST)
             return Response(data, status=status.HTTP_200_OK)
         return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
