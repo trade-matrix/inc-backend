@@ -258,7 +258,7 @@ class WithdrawfromWallet(APIView):
         #investments = Investment.objects.filter(user__id=user.id)
         balance = paystack_balance_check()
         try:
-            balance = balance['data']['balance']
+            b = balance['data']['balance']/100
         except:
             return Response({"error": balance}, status=status.HTTP_400_BAD_REQUEST)
         data = []
@@ -267,7 +267,7 @@ class WithdrawfromWallet(APIView):
             data.append({
                 f"amount1": wallet.balance
             })
-            if not float(balance) > wallet.balance:
+            if not float(b) > wallet.balance:
                 return Response(data, status=status.HTTP_400_BAD_REQUEST)
             return Response(data, status=status.HTTP_200_OK)
         return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
