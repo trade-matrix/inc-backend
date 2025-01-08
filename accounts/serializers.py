@@ -38,6 +38,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         user = Customer.objects.create(**validated_data, password=password)
         user.set_password(user.password)
         user.is_active = False
+        user.platform = 'TM'
         user.save()
 
         # Send SMS with OTP
@@ -170,6 +171,7 @@ class GCRegisterationSerializer(serializers.ModelSerializer):
         user = Customer.objects.create(**validated_data)
         user.set_password(user.password)
         user.is_active = True
+        user.platform = 'GC'
         user.save()
 
         # Send SMS with OTP

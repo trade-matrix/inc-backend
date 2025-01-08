@@ -16,6 +16,7 @@ urlpatterns = [
     path('top-earners/', TopEarners.as_view(), name='top-earners'),
     path('top-earners/gc/', TopEarnersGc.as_view(), name='top-earners-gc'),
     path('alert/', AlertUsersonCompletedWithdrawal.as_view(), name='alert'),
+    path('alert/gc/', AlertUsersonCompletedWithdrawalGC.as_view(), name='alert-gc'),
     path('game/', GameView.as_view(), name='game'),
     path('off/today/', SetGameTodayFalse.as_view(), name='game-today'),
     path('revert/', RevertWithdrawals.as_view(), name='revert'),

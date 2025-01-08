@@ -284,11 +284,17 @@ def withdraw(user, wallet, amount, operator, phone_number):
     if wallet.balance >= float(amount):
         send = paystack_send_money(float(amount), phone_number, user.id, user.recepient_code)
         if not send:
-            Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
-            send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
-            amin_phone = "0599971083"
-            send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", amin_phone)
-            return True
+            try:
+                r_withdraw = Requested_Withdraw.objects.get(user=user, amount=amount, phone_number=phone_number, operator=operator)
+                if r_withdraw:
+                    return False
+            except Requested_Withdraw.DoesNotExist:
+                Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
+                send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
+                update_user(user.email, "Withdarwal Initiated", "Congratulations! Your withdrawal has been initiated successfully.", "withdraw.html")
+                amin_phone = "0599971083"
+                send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", amin_phone)
+                return True
         else:
             send_sms("Your withdrawal has been processed successfully. Refer more to earn more.", user.phone_number)
             update_user(user.email, "Congratulations", "Congratulations! Your withdrawal has been processed successfully.", "withdraw_s.html")

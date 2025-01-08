@@ -12,6 +12,7 @@ class Customer(AbstractUser):
     referal_code = models.CharField(max_length=255, blank=True, null=True)
     recepient_code = models.CharField(max_length=255, blank=True, null=True)
     withdrawal_reference = models.CharField(max_length=255, blank=True, null=True)
+    platform = models.CharField(max_length=255, blank=True, null=True)
 
 class Ref(models.Model):
     reference = models.CharField(max_length=255)
