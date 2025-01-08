@@ -95,18 +95,10 @@ class UserLoginView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         phone_number = serializer.validated_data['phone_number']
-        platform = serializer.validated_data['platform']
+        
         try:
             user = Customer.objects.get(phone_number=phone_number)
         except Customer.DoesNotExist:
-            if platform == 'Gc':
-                user = Customer.objects.create_user(username="investor", phone_number=phone_number)
-                send_otp(user.phone_number, user.username)
-                data = {
-                    "message": "OTP sent",
-                    "user_id": user.id
-                }
-                return Response(data, status=status.HTTP_200_OK)
             raise AuthenticationFailed(detail="Invalid Phone Number")
 
         send_otp(user.phone_number, user.username)
