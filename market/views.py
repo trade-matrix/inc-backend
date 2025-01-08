@@ -20,6 +20,9 @@ from django.utils import timezone  # Use Django's timezone utility
 #pagination
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
+import logging
+
+logger = logging.getLogger(__name__)
 
 class InvestmentListView(generics.ListAPIView):
     queryset = Investment.objects.all()
@@ -282,49 +285,44 @@ class WebhookView(APIView):
         try:
             # Parse the JSON body
             payload = json.loads(request.body.decode('utf-8'))
-
-            # Here you can handle the notification (e.g., update your database, etc.)
+            
+            # Handle transfer success
             if payload.get('event') == 'transfer.success':
-                rcp = payload['recepient']['recipient_code']
-                user = Customer.objects.get(recipient_code=rcp)
-                phone_number = user.phone_number
-                user_id = user.pk
-                #Update Transaction
-                transaction = Transaction.objects.filter(user=user, status='pending', type='withdrawal',amount=float(payload['data']['amount'])/100).first()
-                transaction.status = 'completed'
-                transaction.save()
-            elif payload.get('event') == 'transfer.failed':
-                rcp = payload['recipient']['recepient_code']
-                user = Customer.objects.get(recipient_code=rcp)
-                user_id = user.pk
-                phone_number = user.phone_number
-                wallet = Wallet.objects.get(user=user_id)
-                wallet.balance += float(payload['data']['amount'])/100
-                wallet.save()
-                send_sms("Your withdrawal failed. Your balance has been reverted.", phone_number)   
-            elif payload.get('event') == 'charge.success':
-                reference = payload['data']['reference']
                 try:
-                    user = Customer.objects.get(reference=reference)
-                    user.verified = True
-                    user.save()
+                    recipient_data = payload.get('data', {}).get('recipient', {})
+                    recipient_code = recipient_data.get('recipient_code')
+                    
+                    if not recipient_code:
+                        return JsonResponse({"error": "No recipient code found"}, status=400)
+                    
+                    user = Customer.objects.get(recepient_code=recipient_code)
+                    transaction = Transaction.objects.filter(
+                        user=user, 
+                        status='pending', 
+                        type='withdrawal',
+                        amount=float(payload['data']['amount'])/100
+                    ).first()
+                    
+                    if transaction:
+                        transaction.status = 'completed'
+                        transaction.save()
+                        
+                    return JsonResponse({"message": "Transfer success processed"}, status=200)
+                    
                 except Customer.DoesNotExist:
-                    ref = Ref.objects.get(reference=reference)
-                    user = ref.user
-                amount = float(payload['data']['amount'])/100
-                investment = Investment.objects.get(amount=amount)
-                wallet,_ = Wallet.objects.get_or_create(user=user)
-                # Update the wallet balance
-                h = handle_payment(user, investment, wallet, amount)
-                if not h:
-                    return Response({"error": "Payment failed"}, status=400)
-                return Response({"message": "Payment successful"}, status=200)
-
-            # Respond with a success message
-            return JsonResponse({"message": "Webhook received successfully"}, status=200)
-
+                    return JsonResponse({"error": "User not found"}, status=404)
+                except Exception as e:
+                    logger.error(f"Error processing transfer success: {str(e)}")
+                    return JsonResponse({"error": "Processing error"}, status=500)
+            
+            # Return success for other events
+            return JsonResponse({"message": "Webhook received"}, status=200)
+            
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON"}, status=400)
+        except Exception as e:
+            logger.error(f"Webhook error: {str(e)}")
+            return JsonResponse({"error": "Server error"}, status=500)
 webhook_view = WebhookView.as_view()
 
 class CheckUserMomo(APIView):
