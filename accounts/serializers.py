@@ -7,6 +7,9 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from market.models import Transaction, Investment
 import random
+import logging
+
+logger = logging.getLogger(__name__)
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     referal_code = serializers.CharField(required=False, allow_blank=True)
@@ -16,12 +19,28 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         fields = ('username', 'phone_number', 'referal_code')
     
     def validate_username(self, value):
+        logger.info(f"Original username: {value}")
         # First remove all whitespace
         value = ''.join(value.split())
+        logger.info(f"After whitespace removal: {value}")
         # Then remove any remaining special characters
         cleaned_username = ''.join(char.lower() for char in value if char.isalnum() or char == '_')
+        logger.info(f"Final cleaned username: {cleaned_username}")
+        
         if not cleaned_username:
             raise serializers.ValidationError("Username must contain at least one alphanumeric character")
+            
+        # Check for username conflicts and add random numbers if needed
+        original_username = cleaned_username
+        counter = 0
+        while Customer.objects.filter(username=cleaned_username).exists():
+            random_number = random.randint(1000, 9999)
+            cleaned_username = f"{original_username}{random_number}"
+            counter += 1
+            if counter > 10:  # Prevent infinite loops
+                raise serializers.ValidationError("Unable to generate unique username. Please try a different name.")
+                
+        logger.info(f"Final unique username: {cleaned_username}")
         return cleaned_username
 
     def validate(self, data):
@@ -139,12 +158,28 @@ class GCRegisterationSerializer(serializers.ModelSerializer):
         fields = ('username', 'email', 'referal_code', 'password')
     
     def validate_username(self, value):
+        logger.info(f"Original username: {value}")
         # First remove all whitespace
         value = ''.join(value.split())
+        logger.info(f"After whitespace removal: {value}")
         # Then remove any remaining special characters
         cleaned_username = ''.join(char.lower() for char in value if char.isalnum() or char == '_')
+        logger.info(f"Final cleaned username: {cleaned_username}")
+        
         if not cleaned_username:
             raise serializers.ValidationError("Username must contain at least one alphanumeric character")
+            
+        # Check for username conflicts and add random numbers if needed
+        original_username = cleaned_username
+        counter = 0
+        while Customer.objects.filter(username=cleaned_username).exists():
+            random_number = random.randint(1000, 9999)
+            cleaned_username = f"{original_username}{random_number}"
+            counter += 1
+            if counter > 10:  # Prevent infinite loops
+                raise serializers.ValidationError("Unable to generate unique username. Please try a different name.")
+                
+        logger.info(f"Final unique username: {cleaned_username}")
         return cleaned_username
 
     def validate(self, data):
