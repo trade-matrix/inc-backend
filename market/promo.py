@@ -2,8 +2,11 @@ def message_decider(message, customer, percentage):
     if message == 'news':
         return f"""
             Hello {customer.username},
-Refer and earn 50% of your referee's deposits. The more you refer, the more you earn. Don't miss out on this opportunity. Refer up to a 100 friends and make GH₵ 1000.00.
-The Trade-Matrix Team.
+Trade-Matrix is back!
+No more withdrawal restrictions - withdraw your earnings anytime.
+Earn 50% of your referral's first deposit.
+For our loyal users: No deposit needed. Just refer and earn now.
+Don't miss this special offer!
 """
     elif message == 'promo':
         return f"""

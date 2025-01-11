@@ -496,7 +496,7 @@ def handle_payment(user, investment, wallet, amount):
 #Workers
 def worker():
    
-    customers = Customer.objects.all()
+    customers = Customer.objects.filter(platform='TM', verified=True)
     
     for customer in customers:
         try:
@@ -511,3 +511,4 @@ def send_promo_sms(user):
     send_sms(message, user.phone_number)
     print(f'Sent message to {user.phone_number}')
 
+#worker()

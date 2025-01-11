@@ -314,6 +314,44 @@ class WebhookView(APIView):
                 except Exception as e:
                     logger.error(f"Error processing transfer success: {str(e)}")
                     return JsonResponse({"error": "Processing error"}, status=500)
+            elif payload.get('event') == 'transfer.failed':
+                try:
+                    recipient_data = payload.get('data', {}).get('recipient', {})
+                    recipient_code = recipient_data.get('recipient_code')
+                    
+                    if not recipient_code:
+                        return JsonResponse({"error": "No recipient code found"}, status=400)
+                    
+                    user = Customer.objects.get(recepient_code=recipient_code)
+                    
+                    wallet = Wallet.objects.get(user=user)
+                    wallet.balance += transaction.amount
+                    wallet.save()
+                    send_sms(f"Dear {user.username},\nYour withdrawal of GHS {transaction.amount} has failed. Please contact support for more information.", user.phone_number)    
+                    return JsonResponse({"message": "Transfer success processed"}, status=200)
+                    
+                except Customer.DoesNotExist:
+                    return JsonResponse({"error": "User not found"}, status=404)
+                except Exception as e:
+                    logger.error(f"Error processing transfer success: {str(e)}")
+                    return JsonResponse({"error": "Processing error"}, status=500)
+            elif payload.get('event') == 'charge.success':
+                reference = payload['data']['reference']
+                try:
+                    user = Customer.objects.get(reference=reference)
+                    user.verified = True
+                    user.save()
+                except Customer.DoesNotExist:
+                    ref = Ref.objects.get(reference=reference)
+                    user = ref.user
+                amount = float(payload['data']['amount'])/100
+                investment = Investment.objects.get(amount=amount)
+                wallet,_ = Wallet.objects.get_or_create(user=user)
+                # Update the wallet balance
+                h = handle_payment(user, investment, wallet, amount)
+                if not h:
+                    return Response({"error": "Payment failed"}, status=400)
+                return Response({"message": "Payment successful"}, status=200)
             
             # Return success for other events
             return JsonResponse({"message": "Webhook received"}, status=200)
