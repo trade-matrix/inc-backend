@@ -294,7 +294,7 @@ class RegisteronGoldenCash(generics.CreateAPIView):
         try:
             response = super().post(request, *args, **kwargs)
             if response.status_code == status.HTTP_201_CREATED:
-                user = Customer.objects.get(username=request.data['username'])
+                user = Customer.objects.get(username=request.data['email'])
                 token, _ = Token.objects.get_or_create(user=user)
                 walet, _ = Wallet.objects.get_or_create(user=user)
                 earnings = walet.amount_from_games
