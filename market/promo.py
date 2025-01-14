@@ -23,3 +23,13 @@ Terms and conditions apply.
     Hello {customer.username},
 The 24 hour withdrawal window has been opened. You have from now until tomorrow to make a withdrawal. Don't miss out on this special offer.
 """
+    elif message == 'update':
+        return f"""
+    Hello {customer.username},
+Your account deposit has been updated accordingly. You can now proceed to make referals. Don't miss out on this special offer.
+"""
+    elif message == 'closed':
+        return f"""
+    Hello {customer.username},
+You just earned 10 cedis from your referral. Log in to withdraw your earnings. Don't miss out on this special offer.
+"""

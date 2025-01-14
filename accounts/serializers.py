@@ -200,7 +200,6 @@ class GCRegisterationSerializer(serializers.ModelSerializer):
             phone_number = str(random.randint(100000000, 999999999))
             if not Customer.objects.filter(phone_number=phone_number).exists():
                 break
-        print(**validated_data)
         validated_data['phone_number'] = phone_number
         # The username will already have been sanitized by validate_username
         user = Customer.objects.create(**validated_data)

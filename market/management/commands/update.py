@@ -8,7 +8,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Update users without email to TM
-        tm_users = Customer.objects.filter(platform='TM', verified=True)
+        tm_users = Customer.objects.filter(username='amosasiam')
         #Put Gm Users in ivestment Tier 1
         investment = Investment.objects.get(title='Tier 1')
         for user in tm_users:
