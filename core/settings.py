@@ -197,7 +197,7 @@ CORS_ALLOW_HEADERS = [
 #Email settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp-relay.brevo.com"
-EMAIL_HOST_USER = "deagusco@gmail.com"
-EMAIL_HOST_PASSWORD = "Hsnxt9J1OThfYICB"
+EMAIL_HOST_USER = "83873e001@smtp-brevo.com"
+EMAIL_HOST_PASSWORD = "mjpc54CqFvtnRG13"
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587
