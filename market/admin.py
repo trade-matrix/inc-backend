@@ -9,7 +9,7 @@ admin.site.register(Investment, InvestmentAdmin)
 
 class WalletAdmin(admin.ModelAdmin):
     list_display = ['user', 'deposit', 'balance']
-    search_fields = ['user']
+    search_fields = ['user__username']
 admin.site.register(Wallet, WalletAdmin)
 
 class OperatorAdmin(admin.ModelAdmin):
@@ -44,3 +44,16 @@ admin.site.register(Game, GameAdmin)
 class ProfitAdmin(admin.ModelAdmin):
     list_display = ['name', 'amount_today', 'total_amount',]
 admin.site.register(Profit, ProfitAdmin)
+
+class PoolAdmin(admin.ModelAdmin):
+    list_display = ['name', 'deposits']
+    search_fields = ['name']
+admin.site.register(Pool, PoolAdmin)
+
+class PoolParticipantAdmin(admin.ModelAdmin):
+    list_display = ['pool', 'user', 'joined_at']
+    search_fields = ['pool', 'user']
+admin.site.register(PoolParticipant, PoolParticipantAdmin)
+
+
+

@@ -4,6 +4,7 @@ from .views import *
 urlpatterns = [
     path('webhook/', webhook_view, name='webhook'),
     path('invest/', UserInvest.as_view(), name='invest'),
+    path('create-payment-link/', CreatePaymentLink.as_view(), name='create-payment-link'),
     path('investments/', InvestmentListView.as_view(), name='investments'),
     path('confirm/', VerifyPayment.as_view(), name='confirm'),
     path('withdraw/', WithdrawfromWallet.as_view(), name='withdraw'),

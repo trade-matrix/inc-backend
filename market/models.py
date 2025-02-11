@@ -25,6 +25,7 @@ class Wallet(models.Model):
     eligible = models.BooleanField(default=False)
     active = models.BooleanField(default=False)
     date_made_eligible = models.DateTimeField(auto_now_add=False, blank=True, null=True)
+    valid_for_pool = models.BooleanField(default=False)
     def __str__(self):
         return self.user.username
 
@@ -102,5 +103,18 @@ class Profit(models.Model):
     name = models.CharField(max_length=255, default='Profit')
     amount_today = models.FloatField()
     total_amount = models.FloatField()
+    def __str__(self):
+        return self.name
+
+class PoolParticipant(models.Model):
+    pool = models.ForeignKey('Pool', on_delete=models.CASCADE)
+    user = models.ForeignKey('accounts.Customer', on_delete=models.CASCADE)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+class Pool(models.Model):
+    deposits = models.FloatField(default=0.00)
+    name = models.CharField(max_length=255, default='Pool')
+    participants = models.ManyToManyField('accounts.Customer', through='PoolParticipant')
+
     def __str__(self):
         return self.name

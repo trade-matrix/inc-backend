@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer, Ref
-from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check,update_user
+from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check,update_user, add_to_pool, add_to_deposit
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 import json
@@ -62,6 +62,24 @@ class UserInvest(APIView):
             else:
                 return Response({"error": "User has already invested in another firm"}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"error": "User has Already Invested In this firm"}, status=status.HTTP_400_BAD_REQUEST)
+
+class CreatePaymentLink(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    
+    def post(self, request, *args, **kwargs):
+        amount = request.data.get('amount')
+        payment_response = paystack_payment(amount, 'Pool Payment', request.user.username)
+        if 'error' in payment_response:
+            return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
+        reference = payment_response['data']['reference']
+        request.user.reference = reference
+        request.user.save()
+        Ref.objects.create(reference=reference, user=request.user)
+        data = {
+            "payment_response": payment_response,
+        }
+        return Response(data, status=status.HTTP_200_OK)
 
 class VerifyPayment(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -344,13 +362,22 @@ class WebhookView(APIView):
                 except Customer.DoesNotExist:
                     ref = Ref.objects.get(reference=reference)
                     user = ref.user
-                amount = float(payload['data']['amount'])/100
-                investment = Investment.objects.get(amount=amount)
+                amount = float(payload['data']['amount'])/100 
                 wallet,_ = Wallet.objects.get_or_create(user=user)
-                # Update the wallet balance
-                h = handle_payment(user, investment, wallet, amount)
-                if not h:
-                    return Response({"error": "Payment failed"}, status=400)
+                if amount == 21:
+                    wallet.valid_for_pool = True
+                    wallet.save()
+                    return Response({"message": "Payment successful"}, status=200)
+                elif amount > 21:
+                    am = amount * 0.75
+                    add_to_deposit(user, am)
+                    add_to_pool(user, 1, amount)
+                    return Response({"message": "Payment successful"}, status=200)
+                else:
+                    investment = Investment.objects.get(amount=amount)
+                    h = handle_payment(user, investment, wallet, amount)
+                    if not h:
+                        return Response({"error": "Payment failed"}, status=400)
                 return Response({"message": "Payment successful"}, status=200)
             
             # Return success for other events

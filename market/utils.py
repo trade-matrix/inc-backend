@@ -1,17 +1,25 @@
 import requests
 import uuid
 import os
-from accounts.models import Customer
-from .models import Requested_Withdraw,Transaction,Investment, Wallet, Profit
+from .models import Requested_Withdraw,Transaction,Investment, Wallet, Profit, Pool, PoolParticipant
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from .promo import message_decider
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from celery import shared_task
 
 secret = os.environ.get('Kora_Secret_Key')
 pay_stack_secret = os.environ.get('pay_stack_secret')
+
+# Constants
+STARTUP_FUND = 500.0
+FEE_RATE = 0.15
+ACTIVATION_FEE = 20.0
+MULTIPLIER_A = 1.8
+MULTIPLIER_B = 1.4
+MULTIPLIER_C = 1.0
 
 #KORA PAY FUNCTIONS
 def payment(amount, title, name):
@@ -302,6 +310,13 @@ def withdraw(user, wallet, amount, operator, phone_number):
         wallet.balance = max(wallet.balance, 0)
         wallet.amount_from_games += float(amount)
         wallet.save()
+
+        #Check if user is in pool and deduct from pool
+        pool = Pool.objects.filter(participants=user).first()
+        if pool:
+            pool.deposits -= float(amount)
+            pool.save()
+
         try:
             requested_withdraw = Requested_Withdraw.objects.get(user=user, amount=amount, phone_number=phone_number, operator=operator)
             if not requested_withdraw.settled:
@@ -495,14 +510,13 @@ def handle_payment(user, investment, wallet, amount):
 
 #Workers
 def worker():
-   
-    customers = Customer.objects.filter(platform='TM', verified=True)
+    customers = Requested_Withdraw.objects.filter(settled=False)
     
     for customer in customers:
         try:
-            message = message_decider('news', customer, 10)
+            message = message_decider('news', customer.user, 10)
             send_sms(message, customer.phone_number)
-            print(f'Sent message to {customer.username}')
+            print(f'Sent message to {customer.user}')
         except Exception as e:
             print(f'Error sending message to {customer.phone_number}: {e}')
 
@@ -512,3 +526,106 @@ def send_promo_sms(user):
     print(f'Sent message to {user.phone_number}')
 
 #worker()
+
+#Pool workers
+def distribute_pool_earnings(pool_id):
+    pool = Pool.objects.get(id=pool_id)
+    participants = PoolParticipant.objects.filter(pool=pool).order_by('joined_at')
+    num_users = participants.count()
+
+    if num_users == 0:
+        return
+
+    deposits = pool.deposits
+    
+
+    # Determine group counts
+    if num_users < 10:
+        group_a_count = 1
+        group_b_count = 1 if num_users > 1 else 0
+        group_c_count = num_users - group_a_count - group_b_count
+    else:
+        group_a_count = int(num_users * 0.10)
+        group_b_count = int(num_users * 0.20)
+        group_c_count = num_users - group_a_count - group_b_count
+
+    # Assign users to groups
+    group_a = participants[:group_a_count]
+    group_b = participants[group_a_count:group_a_count + group_b_count]
+    group_c = participants[group_a_count + group_b_count:]
+
+    # Calculate earnings
+    earnings_a = [wallet.deposit * MULTIPLIER_A for wallet in group_a]
+    earnings_b = [wallet.deposit * MULTIPLIER_B for wallet in group_b]
+    earnings_c = [wallet.deposit * MULTIPLIER_C for wallet in group_c]
+
+    # Schedule payouts
+    schedule_payouts(group_a, earnings_a)
+    schedule_payouts(group_b, earnings_b)
+    schedule_payouts(group_c, earnings_c)
+
+def schedule_payouts(users, earnings):
+    for user, earning in zip(users, earnings):
+        payout_amount = earning / 24  # Distribute over 24 hours
+        for hour in range(24):
+            payout_time = timezone.now() + timedelta(hours=hour)
+            add_to_wallet.apply_async((user.user.id, payout_amount), eta=payout_time)
+
+@shared_task
+def add_to_wallet(user_id, amount):
+    wallet = Wallet.objects.get(user_id=user_id)
+    wallet.balance += amount
+    wallet.save()
+
+def add_to_pool(user, pool_id, deposit_amount):
+    """
+    Add a user to a pool with their deposit amount.
+    Returns (success, message) tuple.
+    """
+    try:
+        pool = Pool.objects.get(id=pool_id)
+        wallet = Wallet.objects.get(user=user)
+        
+        # Check if user is already in pool
+        if PoolParticipant.objects.filter(pool=pool, user=user).exists():
+            return False, "You are already in this pool"
+        
+        # Check if user is eligible for pool
+        if not wallet.valid_for_pool:
+            return False, "You are not eligible for this pool"
+            
+        # Add user to pool and track timestamp
+        PoolParticipant.objects.create(
+            pool=pool,
+            user=user,
+            deposit_amount=deposit_amount
+        )
+        
+        # Update pool deposits
+        pool.deposits += deposit_amount
+        pool.save()
+        
+        # Send confirmation SMS
+        send_sms(
+            f"Congratulations {user.username}! You have successfully joined the pool with GHS {deposit_amount}. "
+            "Your earnings will be distributed over the next 24 hours.",
+            user.phone_number
+        )
+        
+        return True, "Successfully joined pool"
+        
+    except Pool.DoesNotExist:
+        return False, "Pool not found"
+    except Wallet.DoesNotExist:
+        return False, "Wallet not found"
+    except Exception as e:
+        return False, f"An error occurred: {str(e)}"
+
+def add_to_deposit(user, amount):
+    wallet = Wallet.objects.get(user=user)
+    wallet.deposit += amount
+    wallet.save()
+    Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
+    return True
+
+
