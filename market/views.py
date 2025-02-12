@@ -369,7 +369,7 @@ class WebhookView(APIView):
                     wallet.save()
                     return Response({"message": "Payment successful 21 CEDIS"}, status=200)
                 elif amount > 21:
-                    am = amount * 0.75
+                    am = amount * 0.85
                     add_to_deposit(user, am)
                     add_to_pool(user, 1, amount)
                     return Response({"message": "Payment successful"}, status=200)
