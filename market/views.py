@@ -372,7 +372,7 @@ class WebhookView(APIView):
                     am = amount * 0.85
                     add_to_deposit(user, am)
                     add_to_pool(user, 1, amount)
-                    return Response({"message": "Payment successful"}, status=200)
+                    return Response({"message": "Payment successful, added to pool"}, status=200)
                 else:
                     investment = Investment.objects.get(amount=amount)
                     h = handle_payment(user, investment, wallet, amount)
