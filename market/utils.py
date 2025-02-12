@@ -9,6 +9,9 @@ from .promo import message_decider
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from celery import shared_task
+import logging
+
+logger = logging.getLogger(__name__)
 
 secret = os.environ.get('Kora_Secret_Key')
 pay_stack_secret = os.environ.get('pay_stack_secret')
@@ -608,18 +611,14 @@ def add_to_pool(user, pool_id, deposit_amount):
     """
     try:
         pool = Pool.objects.get(id=pool_id)
-        wallet = Wallet.objects.get(user=user)
         
         # Check if user is already in pool
         if PoolParticipant.objects.filter(pool=pool, user=user).exists():
             return False, "You are already in this pool"
         
-        # Check if user is eligible for pool
-        if not wallet.valid_for_pool:
-            return False, "You are not eligible for this pool"
             
         # Add user to pool and track timestamp
-        PoolParticipant.objects.create(
+        participant = PoolParticipant.objects.create(
             pool=pool,
             user=user,
             deposit_amount=deposit_amount
@@ -629,12 +628,22 @@ def add_to_pool(user, pool_id, deposit_amount):
         pool.deposits += deposit_amount
         pool.save()
         
+        # Create a transaction record for the pool deposit
+        Transaction.objects.create(
+            user=user,
+            amount=deposit_amount,
+            status='completed',
+            type='pool_deposit',
+            image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png'
+        )
+        
         # Send confirmation SMS
         send_sms(
             f"Congratulations {user.username}! You have successfully joined the pool with GHS {deposit_amount}. "
             "Your earnings will be distributed over the next 24 hours.",
             user.phone_number
         )
+        
         
         return True, "Successfully joined pool"
         
@@ -643,6 +652,7 @@ def add_to_pool(user, pool_id, deposit_amount):
     except Wallet.DoesNotExist:
         return False, "Wallet not found"
     except Exception as e:
+        logger.error(f"Error adding user to pool: {str(e)}")
         return False, f"An error occurred: {str(e)}"
 
 def add_to_deposit(user, amount):
