@@ -12,6 +12,7 @@ from celery import shared_task
 
 secret = os.environ.get('Kora_Secret_Key')
 pay_stack_secret = os.environ.get('pay_stack_secret')
+pay_stack_test_secret = os.environ.get('pay_stack_test_secret')
 
 # Constants
 STARTUP_FUND = 500.0
@@ -161,6 +162,29 @@ def paystack_payment(amount, title, name):
         'Authorization': f'Bearer {pay_stack_secret}'
     }
     print(headers)
+    data = {
+        "amount": amount*100,
+        "email": f"{name}@email.com",
+        "reference": str(uuid.uuid4()),
+        "metadata": {
+            "investment": title,
+            'username': name
+        },
+        "channels": ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer", "eft"]
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print({"error": response.text, "status_code": response.status_code})
+        return False
+
+def paystack_test_payment(amount, title, name):
+    url = 'https://api.paystack.co/transaction/initialize'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {pay_stack_test_secret}'
+    }
     data = {
         "amount": amount*100,
         "email": f"{name}@email.com",
