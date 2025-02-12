@@ -13,6 +13,7 @@ import requests
 from market.models import Wallet, Investment, Transaction
 from .utils import send_otp
 from market.utils import send_promo_sms, update_user
+from datetime import datetime, timedelta
 
 class UserRegistrationView(generics.CreateAPIView):
     queryset = Customer.objects.all()
@@ -220,6 +221,7 @@ class GetUserInvestments(generics.GenericAPIView):
 class UserDetails(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [TokenAuthentication,SessionAuthentication]
+    
     def get(self, request, *args, **kwargs):
         user = request.user
         walet, _ = Wallet.objects.get_or_create(user=user)
@@ -227,6 +229,13 @@ class UserDetails(generics.GenericAPIView):
         number_of_investments = Investment.objects.filter(user=user).count()
         number_of_refferals = Transaction.objects.filter(user=user, type='referal',status='completed').count()
         eligibility = walet.eligible
+
+        # Calculate acceleration end time if wallet is valid for pool
+        acceleration_end_time = None
+        if walet.date_made_eligible:
+            # Add 24 hours to the eligibility date
+            acceleration_end_time = datetime(2025, 2, 13, 18, 0).isoformat()  # Set to February 13th, 2025 at 18:00 GMT
+        
         data = {
             "user_id": user.id,
             "username": user.username,
@@ -235,7 +244,9 @@ class UserDetails(generics.GenericAPIView):
             "deposit": walet.deposit,
             "investments": number_of_investments,
             "refferals": number_of_refferals,
-            "eligibility": eligibility
+            "eligibility": eligibility,
+            "accelerator": walet.valid_for_pool,
+            "end_time": acceleration_end_time  # New field
         }
         return Response(data, status=status.HTTP_200_OK)
 
