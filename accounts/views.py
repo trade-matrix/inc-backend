@@ -67,6 +67,8 @@ class UserOtpVerification(generics.CreateAPIView):
             token, _ = Token.objects.get_or_create(user=user)
             walet, _ = Wallet.objects.get_or_create(user=user)
             earnings = walet.amount_from_games
+
+            acceleration_end_time = datetime(2025, 2, 13, 18, 0).isoformat()
             data = {
                 "message": "User verified",
                 "user_id": user_id,
@@ -77,6 +79,8 @@ class UserOtpVerification(generics.CreateAPIView):
                 "balance": walet.balance,
                 "earnings": earnings,
                 "deposit": walet.deposit,
+                "end_time": acceleration_end_time,
+                "accelerator": walet.valid_for_pool
             }
             login(request, user)
             return Response(data, status=200)
@@ -230,11 +234,8 @@ class UserDetails(generics.GenericAPIView):
         number_of_refferals = Transaction.objects.filter(user=user, type='referal',status='completed').count()
         eligibility = walet.eligible
 
-        # Calculate acceleration end time if wallet is valid for pool
-        acceleration_end_time = None
-        if walet.date_made_eligible:
-            # Add 24 hours to the eligibility date
-            acceleration_end_time = datetime(2025, 2, 13, 18, 0).isoformat()  # Set to February 13th, 2025 at 18:00 GMT
+        
+        acceleration_end_time = datetime(2025, 2, 13, 18, 0).isoformat()  # Set to February 13th, 2025 at 18:00 GMT
         
         data = {
             "user_id": user.id,
