@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer, Ref
-from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check,update_user, add_to_pool, add_to_deposit, paystack_test_payment, distribute_pool_earnings
+from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check,update_user, add_to_pool, add_to_deposit, distribute_pool_earnings
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 import json
@@ -69,7 +69,7 @@ class CreatePaymentLink(APIView):
     
     def post(self, request, *args, **kwargs):
         amount = float(request.data.get('amount'))
-        payment_response = paystack_test_payment(amount, 'Pool Payment', request.user.username)
+        payment_response = paystack_payment(amount, 'Pool Payment', request.user.username)
         if 'error' in payment_response:
             return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
         reference = payment_response['data']['reference']
