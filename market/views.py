@@ -371,7 +371,9 @@ class WebhookView(APIView):
                 elif amount > 21:
                     am = amount * 0.85
                     add_to_deposit(user, am)
-                    add_to_pool(user, 1, amount)
+                    success, message = add_to_pool(user, 1, amount)
+                    if not success:
+                        return Response({"error": message}, status=400)
                     return Response({"message": "Payment successful, added to pool"}, status=200)
                 else:
                     investment = Investment.objects.get(amount=amount)

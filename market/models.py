@@ -109,6 +109,7 @@ class Profit(models.Model):
 class PoolParticipant(models.Model):
     pool = models.ForeignKey('Pool', on_delete=models.CASCADE)
     user = models.ForeignKey('accounts.Customer', on_delete=models.CASCADE)
+    deposit_amount = models.FloatField(default=0.00)
     joined_at = models.DateTimeField(auto_now_add=True)
 
 class Pool(models.Model):

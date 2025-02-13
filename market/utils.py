@@ -609,6 +609,7 @@ def add_to_pool(user, pool_id, deposit_amount):
     Add a user to a pool with their deposit amount.
     Returns (success, message) tuple.
     """
+    logger.info(f"Adding user {user.username} to pool {pool_id} with deposit amount {deposit_amount}")
     try:
         pool = Pool.objects.get(id=pool_id)
         
@@ -644,7 +645,7 @@ def add_to_pool(user, pool_id, deposit_amount):
             user.phone_number
         )
         
-        
+        logger.info(f"Successfully added user {user.username} to pool {pool_id} with deposit amount {deposit_amount}")
         return True, "Successfully joined pool"
         
     except Pool.DoesNotExist:

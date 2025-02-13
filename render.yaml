@@ -1,0 +1,29 @@
+services:
+  - type: worker
+    name: celery-worker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A core worker -l info
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: redis
+          type: redis
+          property: connectionString
+
+  - type: worker
+    name: celery-beat
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A core beat -l info
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: redis
+          type: redis
+          property: connectionString
+
+  - type: redis
+    name: redis
+    ipAllowList: []
+    plan: free 
