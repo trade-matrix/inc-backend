@@ -21,4 +21,5 @@ urlpatterns = [
     path('game/', GameView.as_view(), name='game'),
     path('off/today/', SetGameTodayFalse.as_view(), name='game-today'),
     path('revert/', RevertWithdrawals.as_view(), name='revert'),
+    path('distribute-pool/', DistributePoolEarnings.as_view(), name='distribute-pool'),
 ]

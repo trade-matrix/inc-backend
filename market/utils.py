@@ -582,9 +582,9 @@ def distribute_pool_earnings(pool_id):
     group_c = participants[group_a_count + group_b_count:]
 
     # Calculate earnings
-    earnings_a = [wallet.deposit * MULTIPLIER_A for wallet in group_a]
-    earnings_b = [wallet.deposit * MULTIPLIER_B for wallet in group_b]
-    earnings_c = [wallet.deposit * MULTIPLIER_C for wallet in group_c]
+    earnings_a = [wallet.deposit_amount * MULTIPLIER_A for wallet in group_a]
+    earnings_b = [wallet.deposit_amount * MULTIPLIER_B for wallet in group_b]
+    earnings_c = [wallet.deposit_amount * MULTIPLIER_C for wallet in group_c]
 
     # Schedule payouts
     schedule_payouts(group_a, earnings_a)
@@ -593,12 +593,9 @@ def distribute_pool_earnings(pool_id):
 
 def schedule_payouts(users, earnings):
     for user, earning in zip(users, earnings):
-        payout_amount = earning / 24  # Distribute over 24 hours
-        for hour in range(24):
-            payout_time = timezone.now() + timedelta(hours=hour)
-            add_to_wallet.apply_async((user.user.id, payout_amount), eta=payout_time)
+        add_to_wallet(user.user.id, earning)
 
-@shared_task
+
 def add_to_wallet(user_id, amount):
     wallet = Wallet.objects.get(user_id=user_id)
     wallet.balance += amount

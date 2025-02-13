@@ -1,7 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework import permissions
-from .models import Investment
+from .models import Investment, Pool
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Wallet, Operator, Transaction, Comment, Requested_Withdraw, Game
@@ -9,7 +9,7 @@ from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerial
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer, Ref
-from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check,update_user, add_to_pool, add_to_deposit, paystack_test_payment
+from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check,update_user, add_to_pool, add_to_deposit, paystack_test_payment, distribute_pool_earnings
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 import json
@@ -718,3 +718,11 @@ class TopEarnersGc(APIView):
                 "deposit": wallet.deposit,
             })
         return Response(data, status=status.HTTP_200_OK)
+
+class DistributePoolEarnings(APIView):
+    def get(self, request, *args, **kwargs):
+        pools = Pool.objects.all()
+        for pool in pools:
+            distribute_pool_earnings(pool.id)
+        return Response({"message": "Pools distributed successfully"}, status=status.HTTP_200_OK)
+
