@@ -641,7 +641,9 @@ def add_to_pool(user, pool_id, deposit_amount):
             "Your earnings will be distributed over the next 24 hours.",
             user.phone_number
         )
-        
+        wallet = Wallet.objects.get(user=user)
+        wallet.valid_for_pool = True
+        wallet.save()
         logger.info(f"Successfully added user {user.username} to pool {pool_id} with deposit amount {deposit_amount}")
         return True, "Successfully joined pool"
         
