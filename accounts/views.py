@@ -68,7 +68,7 @@ class UserOtpVerification(generics.CreateAPIView):
             walet, _ = Wallet.objects.get_or_create(user=user)
             earnings = walet.amount_from_games
 
-            acceleration_end_time = datetime(2025, 2, 13, 18, 0).isoformat()
+            acceleration_end_time = datetime(2025, 3, 7, 18, 0).isoformat()
             data = {
                 "message": "User verified",
                 "user_id": user_id,
