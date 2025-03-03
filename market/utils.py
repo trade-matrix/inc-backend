@@ -619,7 +619,7 @@ def add_to_pool(user, pool_id, deposit_amount):
         participant = PoolParticipant.objects.create(
             pool=pool,
             user=user,
-            deposit_amount=deposit_amount
+            deposit_amount=deposit_amount*0.85
         )
         
         # Update pool deposits
@@ -629,7 +629,7 @@ def add_to_pool(user, pool_id, deposit_amount):
         # Create a transaction record for the pool deposit
         Transaction.objects.create(
             user=user,
-            amount=deposit_amount,
+            amount=deposit_amount*0.85,
             status='completed',
             type='pool_deposit',
             image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png'
