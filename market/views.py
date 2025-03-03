@@ -1,7 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework import permissions
-from .models import Investment, Pool
+from .models import Investment, Pool, PoolParticipant
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Wallet, Operator, Transaction, Comment, Requested_Withdraw, Game
@@ -21,6 +21,10 @@ from django.utils import timezone  # Use Django's timezone utility
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 import logging
+
+MULTIPLIER_A = 2.0
+MULTIPLIER_B = 1.5
+MULTIPLIER_C = 1.0
 
 logger = logging.getLogger(__name__)
 
@@ -718,6 +722,135 @@ class TopEarnersGc(APIView):
                 "deposit": wallet.deposit,
             })
         return Response(data, status=status.HTTP_200_OK)
+
+class UserPoolGroupStatus(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        
+        # Find the pool that the user is in
+        try:
+            # Get the user's pool participation
+            pool_participant = PoolParticipant.objects.filter(user=user).first()
+            
+            if not pool_participant:
+                return Response({"error": "You are not currently in any pool"}, status=status.HTTP_404_NOT_FOUND)
+                
+            pool = pool_participant.pool
+            
+            # Get all participants sorted by join date (as in distribute_pool_earnings)
+            participants = PoolParticipant.objects.filter(pool=pool).order_by('joined_at')
+            num_users = participants.count()
+            
+            # Find the position of the current user
+            user_position = 0
+            for i, participant in enumerate(participants):
+                if participant.user.id == user.id:
+                    user_position = i
+                    break
+            
+            # Determine the groups based on the same logic in distribute_pool_earnings
+            if num_users < 10:
+                group_a_count = 1
+                group_b_count = 1 if num_users > 1 else 0
+                group_c_count = num_users - group_a_count - group_b_count
+            else:
+                group_a_count = int(num_users * 0.10)
+                group_b_count = int(num_users * 0.20)
+                group_c_count = num_users - group_a_count - group_b_count
+            
+            # Determine current group and next group
+            current_group = ""
+            next_group = ""
+            users_needed = 0
+            
+            if user_position < group_a_count:
+                current_group = "A"
+                next_group = None  # Already in the highest group
+                users_needed = 0
+            elif user_position < (group_a_count + group_b_count):
+                current_group = "B"
+                next_group = "A"
+                # Calculate users needed to expand group A enough to include this user
+                if num_users >= 10:
+                    # For 10+ users, group A is 10% of users
+                    # Calculate how many total users needed for this user to be in top 10%
+                    current_position = user_position + 1  # 1-based position
+                    users_needed = max(0, int(current_position / 0.10) - num_users)
+                else:
+                    # For <10 users, group A is just 1 person
+                    users_needed = user_position  # Need enough users so that user_position becomes 0
+            else:
+                current_group = "C"
+                # Determine if next achievable group is A or B
+                if user_position < group_a_count + group_b_count + (num_users * 0.10):
+                    next_group = "B"
+                    # Calculate how many users needed to expand group B enough to include this user
+                    if num_users >= 10:
+                        # Current position within Group C
+                        position_in_c = user_position - (group_a_count + group_b_count) + 1
+                        # Need enough new users to push user into group B
+                        new_total = num_users
+                        while True:
+                            # Calculate new group sizes
+                            new_group_a = int(new_total * 0.10)
+                            new_group_b = int(new_total * 0.20)
+                            # Check if user would be in group B
+                            if user_position < new_group_a + new_group_b:
+                                break
+                            new_total += 1
+                        users_needed = new_total - num_users
+                    else:
+                        # For <10 users, just need to be in top 2 positions
+                        users_needed = user_position - 1
+                else:
+                    next_group = "B"  # Very far down, aim for B first
+                    # Similar calculation to above
+                    if num_users >= 10:
+                        # Current position within Group C
+                        position_in_c = user_position - (group_a_count + group_b_count) + 1
+                        # Need enough new users to push user into group B
+                        new_total = num_users
+                        while True:
+                            # Calculate new group sizes
+                            new_group_a = int(new_total * 0.10)
+                            new_group_b = int(new_total * 0.20)
+                            # Check if user would be in group B
+                            if user_position < new_group_a + new_group_b:
+                                break
+                            new_total += 1
+                        users_needed = new_total - num_users
+                    else:
+                        # For <10 users, just need to be in top 2 positions
+                        users_needed = user_position - 1
+            
+            # Get the multiplier for the current group
+            multiplier = 0
+            if current_group == "A":
+                multiplier = MULTIPLIER_A
+            elif current_group == "B":
+                multiplier = MULTIPLIER_B
+            else:
+                multiplier = MULTIPLIER_C
+                
+            response_data = {
+                "pool_id": pool.id,
+                "total_participants": num_users,
+                "user_position": user_position + 1,  # 1-indexed position for display
+                "current_group": current_group,
+                "current_multiplier": multiplier,
+                "next_group": next_group,
+                "users_needed_for_promotion": users_needed,
+                "deposit_amount": pool_participant.deposit_amount
+            }
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error getting user pool status: {str(e)}")
+            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class DistributePoolEarnings(APIView):
     def get(self, request, *args, **kwargs):

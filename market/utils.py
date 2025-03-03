@@ -21,8 +21,8 @@ pay_stack_test_secret = os.environ.get('pay_stack_test_secret')
 STARTUP_FUND = 500.0
 FEE_RATE = 0.15
 ACTIVATION_FEE = 20.0
-MULTIPLIER_A = 1.8
-MULTIPLIER_B = 1.4
+MULTIPLIER_A = 2.0
+MULTIPLIER_B = 1.5
 MULTIPLIER_C = 1.0
 
 #KORA PAY FUNCTIONS
