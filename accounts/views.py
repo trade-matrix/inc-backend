@@ -10,7 +10,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .exceptions import ExternalAPIError
 import requests
-from market.models import Wallet, Investment, Transaction
+from market.models import Wallet, Investment, Transaction, PoolParticipant
 from .utils import send_otp
 from market.utils import send_promo_sms, update_user
 from datetime import datetime, timedelta
@@ -69,6 +69,7 @@ class UserOtpVerification(generics.CreateAPIView):
             earnings = walet.amount_from_games
 
             acceleration_end_time = datetime(2025, 3, 7, 18, 0).isoformat()
+            is_user_in_pool = PoolParticipant.objects.filter(user=user).exists()
             data = {
                 "message": "User verified",
                 "user_id": user_id,
@@ -80,7 +81,8 @@ class UserOtpVerification(generics.CreateAPIView):
                 "earnings": earnings,
                 "deposit": walet.deposit,
                 "end_time": acceleration_end_time,
-                "accelerator": walet.valid_for_pool
+                "accelerator": walet.valid_for_pool,
+                "is_user_in_pool": is_user_in_pool
             }
             login(request, user)
             return Response(data, status=200)
@@ -233,7 +235,7 @@ class UserDetails(generics.GenericAPIView):
         number_of_investments = Investment.objects.filter(user=user).count()
         number_of_refferals = Transaction.objects.filter(user=user, type='referal',status='completed').count()
         eligibility = walet.eligible
-
+        is_user_in_pool = PoolParticipant.objects.filter(user=user).exists()
         
         acceleration_end_time = datetime(2025, 3, 7, 18, 0).isoformat()  # Set to February 13th, 2025 at 18:00 GMT
         
@@ -247,7 +249,8 @@ class UserDetails(generics.GenericAPIView):
             "refferals": number_of_refferals,
             "eligibility": eligibility,
             "accelerator": walet.valid_for_pool,
-            "end_time": acceleration_end_time  # New field
+            "end_time": acceleration_end_time,
+            "is_user_in_pool": is_user_in_pool
         }
         return Response(data, status=status.HTTP_200_OK)
 
