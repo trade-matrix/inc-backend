@@ -237,7 +237,7 @@ class UserDetails(generics.GenericAPIView):
         eligibility = walet.eligible
         is_user_in_pool = PoolParticipant.objects.filter(user=user).exists()
         
-        acceleration_end_time = datetime(2025, 3, 7, 18, 0).isoformat()  # Set to February 13th, 2025 at 18:00 GMT
+        acceleration_end_time = datetime(2025, 3, 21, 18, 0).isoformat()  # Set to February 13th, 2025 at 18:00 GMT
         
         data = {
             "user_id": user.id,
