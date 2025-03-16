@@ -161,3 +161,4 @@ cython_debug/
 websocket.py
 /investment
 worker.py
+market/management/commands/update.py
