@@ -317,6 +317,11 @@ def withdraw_optout(user,wallet, amount, operator, phone_number):
 
 def withdraw(user, wallet, amount, operator, phone_number):
     if wallet.balance >= float(amount):
+        wallet.balance -= float(amount)
+        wallet.balance = max(wallet.balance, 0)
+        wallet.amount_from_games += float(amount)
+        wallet.save()
+
         send = paystack_send_money(float(amount), phone_number, user.id, user.recepient_code)
         if not send:
             try:
@@ -326,40 +331,13 @@ def withdraw(user, wallet, amount, operator, phone_number):
             except Requested_Withdraw.DoesNotExist:
                 Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
                 send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
-                update_user(user.email, "Withdarwal Initiated", "Congratulations! Your withdrawal has been initiated successfully.", "withdraw.html")
+                #update_user(user.email, "Withdarwal Initiated", "Congratulations! Your withdrawal has been initiated successfully.", "withdraw.html")
                 amin_phone = "0599971083"
                 send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", amin_phone)
                 return True
         else:
             send_sms("Your withdrawal has been processed successfully. Refer more to earn more.", user.phone_number)
-            update_user(user.email, "Congratulations", "Congratulations! Your withdrawal has been processed successfully.", "withdraw_s.html")
-        wallet.balance -= float(amount)
-        wallet.balance = max(wallet.balance, 0)
-        wallet.amount_from_games += float(amount)
-        wallet.save()
-
-        #Check if user is in pool and deduct from pool
-        pool = Pool.objects.filter(participants=user).first()
-        if pool:
-            pool.deposits -= float(amount)
-            pool.save()
-
-        try:
-            requested_withdraw = Requested_Withdraw.objects.get(user=user, amount=amount, phone_number=phone_number, operator=operator)
-            if not requested_withdraw.settled:
-                requested_withdraw.settled = True
-                requested_withdraw.save()
-        except Requested_Withdraw.DoesNotExist:
-            pass
-        # Send balance update to the WebSocket consumer
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"user_{user.id}",  # Unique group for each user
-            {
-                "type": "send_balance_update",
-                "new_balance": wallet.balance,
-            }
-        )
+            #update_user(user.email, "Congratulations", "Congratulations! Your withdrawal has been processed successfully.", "withdraw_success.html")
         #Create a transaction record
         Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
         return True 
@@ -378,57 +356,8 @@ def check_referrer_status(wallet, amount, reffered_wallet):
     profit.save()
     return True
 
-def handle_payment(user, investment, wallet, amount):
-    if not user.referred_by:
-        wallet.deposit += amount  # For example, adding a deposit
-        # Update the wallet balance
-        wallet.active = True
-        wallet.eligible = True
-        wallet.date_made_eligible = datetime.now()
-        wallet.save()
-        # Create a transaction record
-        transaction = Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
-        # Serialize the transaction into JSON-serializable data
-        transaction_data = {
-            'id': transaction.id,
-            'user': transaction.user.id,  # Assuming you're using the user's ID
-            'amount': transaction.amount,
-            'status': transaction.status,
-            'type': transaction.type,
-            'created_at': transaction.created_at.isoformat()  # Convert datetime to ISO format
-        }
-
-        # Send the serialized transaction to the WebSocket consumer
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"user_{user.id}",
-            {
-                "type": "send_user_transaction",
-                "transaction": transaction_data  # Send the serialized data
-            }
-        )
-
-        # Send balance update to the WebSocket consumer
-        balance_data ={
-            "new_balance": wallet.balance,
-            "earnings": wallet.balance - wallet.deposit
-        }
-        async_to_sync(channel_layer.group_send)(
-            f"user_{user.id}",  # Unique group for each user
-            {
-                "type": "send_balance_update",
-                "new_balance": balance_data,
-            }
-        )
-        investment.user.add(user)
-        investment.save()
-        async_to_sync(channel_layer.group_send)(
-            f"user_{user.id}",
-            {
-                "type": "send_user_verified",
-            }
-        )
-    elif user.referred_by:
+def handle_payment(user, investment, wallet, amount):  
+    if user.referred_by:
         wallet.deposit += amount  # For example, adding a deposit
         # Update the wallet balance
         if amount == 15:

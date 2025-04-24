@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from .serializers import UserLoginSerializer, UserRegistrationSerializer, UserOtpVerificationSerializer, UserResendOtpSerializer, InvestmentSerializer, ReferredUserSerializer, GCRegisterationSerializer, GCLoginSerializer
-from .models import Customer
+from .models import Customer, Ref, Vendor
 import os
 from rest_framework.authentication import TokenAuthentication,SessionAuthentication
 from rest_framework import generics, status
@@ -63,20 +63,10 @@ class UserRegistrationView(APIView):
                 # --- End of OTP Sending Logic ---
             else:
                 payment_link = paystack_payment(200, user.email, user.phone_number, 'registration')
-                #award referral bonus
-            if user.referred_by:
-                referrer = user.referred_by
-                referrer_wallet = Wallet.objects.get(user=referrer)
-                referrer_wallet.balance += 100
-                referrer_wallet.save()
-            #award the vendor
-            if user.vendor:
-                vendor = user.vendor
-                #get the vendor's wallet
-                vendor_wallet = Wallet.objects.get(user=vendor.user)
-                vendor_wallet.balance += 20
-                vendor_wallet.save()
-            
+                user.reference = payment_link.get("data").get("reference")
+                user.save()
+                #Create a ref
+                Ref.objects.create(user=user, reference=payment_link.get("data").get("reference"))
             # Prepare successful response
             response_data = {
                 "message": "User registered successfully. OTP sent.",
@@ -181,6 +171,10 @@ class UserLoginView(generics.CreateAPIView):
             }
         else:
             payment_link = paystack_payment(200, user.email, user.phone_number, 'registration')
+            user.reference = payment_link.get("data").get("reference")
+            user.save()
+            #Create a ref
+            Ref.objects.create(user=user, reference=payment_link.get("data").get("reference"))
             data = {
                 "user_id": user.id,
                 "user_paid": user.paid,
@@ -260,10 +254,13 @@ class UserCreateReferalLink(generics.GenericAPIView):
             
         user = request.user
         # Check for both null and empty email
-        if user.email is None or user.email.strip() == '':
-            referal_link = f"https://trade-matrix.net/auth/sign-up/?referral={user.username}"
-        else:
-            referal_link = f"https://goldencash.live/auth/sign-up/?referral={user.username}"
+        referal_link = f"https://tm-hub.com/auth/sign-up/?referral={user.username}"
+        #Check if user is associated with a vendor model
+        try:
+            vendor = Vendor.objects.get(user=user)
+            referal_link = f"https://tm-hub.com/auth/sign-up/?referral={user.username}&vendor={vendor.code}"
+        except Vendor.DoesNotExist:
+            pass
             
         data = {
             "referal_link": referal_link,

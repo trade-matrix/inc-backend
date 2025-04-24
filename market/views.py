@@ -12,6 +12,7 @@ from accounts.models import Customer, Ref
 from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check,update_user, add_to_pool, add_to_deposit, distribute_pool_earnings
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
+from accounts.utils import send_otp
 import json
 from django.views.decorators.csrf import csrf_exempt
 import datetime
@@ -73,7 +74,10 @@ class CreatePaymentLink(APIView):
     
     def post(self, request, *args, **kwargs):
         amount = float(request.data.get('amount'))
-        payment_response = paystack_payment(amount, 'Pool Payment', request.user.username)
+        type = request.data.get('type')
+        email = request.data.get('email')
+        phone_number = request.data.get('phone_number')
+        payment_response = paystack_payment(amount, email, phone_number, type)
         if 'error' in payment_response:
             return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
         reference = payment_response['data']['reference']
@@ -307,84 +311,54 @@ class WebhookView(APIView):
         try:
             # Parse the JSON body
             payload = json.loads(request.body.decode('utf-8'))
-            
-            # Handle transfer success
-            if payload.get('event') == 'transfer.success':
-                try:
-                    recipient_data = payload.get('data', {}).get('recipient', {})
-                    recipient_code = recipient_data.get('recipient_code')
-                    
-                    if not recipient_code:
-                        return JsonResponse({"error": "No recipient code found"}, status=400)
-                    
-                    user = Customer.objects.get(recepient_code=recipient_code)
-                    transaction = Transaction.objects.filter(
-                        user=user, 
-                        status='pending', 
-                        type='withdrawal',
-                        amount=float(payload['data']['amount'])/100
-                    ).first()
-                    
-                    if transaction:
-                        transaction.status = 'completed'
-                        transaction.save()
-                        
-                    return JsonResponse({"message": "Transfer success processed"}, status=200)
-                    
-                except Customer.DoesNotExist:
-                    return JsonResponse({"error": "User not found"}, status=404)
-                except Exception as e:
-                    logger.error(f"Error processing transfer success: {str(e)}")
-                    return JsonResponse({"error": "Processing error"}, status=500)
-            elif payload.get('event') == 'transfer.failed':
-                try:
-                    recipient_data = payload.get('data', {}).get('recipient', {})
-                    recipient_code = recipient_data.get('recipient_code')
-                    
-                    if not recipient_code:
-                        return JsonResponse({"error": "No recipient code found"}, status=400)
-                    
-                    user = Customer.objects.get(recepient_code=recipient_code)
-                    
-                    wallet = Wallet.objects.get(user=user)
-                    wallet.balance += transaction.amount
-                    wallet.save()
-                    send_sms(f"Dear {user.username},\nYour withdrawal of GHS {transaction.amount} has failed. Please contact support for more information.", user.phone_number)    
-                    return JsonResponse({"message": "Transfer success processed"}, status=200)
-                    
-                except Customer.DoesNotExist:
-                    return JsonResponse({"error": "User not found"}, status=404)
-                except Exception as e:
-                    logger.error(f"Error processing transfer success: {str(e)}")
-                    return JsonResponse({"error": "Processing error"}, status=500)
-            elif payload.get('event') == 'charge.success':
+            #Check if the event is a charge.success
+            if payload.get('event') == 'charge.success':
                 reference = payload['data']['reference']
-                try:
-                    user = Customer.objects.get(reference=reference)
-                    user.verified = True
-                    user.save()
-                except Customer.DoesNotExist:
-                    ref = Ref.objects.get(reference=reference)
-                    user = ref.user
-                amount = float(payload['data']['amount'])/100 
-                wallet,_ = Wallet.objects.get_or_create(user=user)
-                if amount == 21:
-                    wallet.valid_for_pool = True
+                type = payload['data']['metadata']['type']
+                if type == 'registration':
+                    try:
+                        # Try to get user directly or through reference
+                        try:
+                            user = Customer.objects.get(reference=reference)
+                        except Customer.DoesNotExist:
+                            try:
+                                ref = Ref.objects.get(reference=reference)
+                                user = ref.user
+                            except Ref.DoesNotExist:
+                                return JsonResponse({"error": "Referral not found"}, status=404)
+                        
+                        # Update user status
+                        user.paid = True
+                        user.verified = True
+                        user.is_active = True
+                        user.save()
+                        
+                        # Send OTP
+                        send_otp(user.phone_number, user.username)
+                        
+                        # Handle referral bonus
+                        if user.referred_by:
+                            referrer = user.referred_by
+                            referrer_wallet = Wallet.objects.get(user=referrer)
+                            referrer_wallet.balance += 100
+                            referrer_wallet.save()
+
+                        # Handle vendor bonus
+                        if user.vendor:
+                            vendor = user.vendor
+                            vendor_wallet = Wallet.objects.get(user=vendor.user)
+                            vendor_wallet.balance += 20
+                            vendor_wallet.save()
+                            
+                    except Exception as e:
+                        logger.error(f"Registration webhook error: {str(e)}")
+                        return JsonResponse({"error": str(e)}, status=500)
+                elif type == 'deposit':
+                    amount = float(payload['data']['amount'])/100 
+                    wallet,_ = Wallet.objects.get_or_create(user=user)
+                    wallet.balance += amount
                     wallet.save()
-                    return Response({"message": "Payment successful 21 CEDIS"}, status=200)
-                elif amount > 21:
-                    am = amount * 0.85
-                    add_to_deposit(user, am)
-                    success, message = add_to_pool(user, 1, amount)
-                    if not success:
-                        return Response({"error": message}, status=400)
-                    return Response({"message": "Payment successful, added to pool"}, status=200)
-                else:
-                    investment = Investment.objects.get(amount=amount)
-                    h = handle_payment(user, investment, wallet, amount)
-                    if not h:
-                        return Response({"error": "Payment failed"}, status=400)
-                return Response({"message": "Payment successful"}, status=200)
+                    return Response({"message": "Payment successful"}, status=200)
             
             # Return success for other events
             return JsonResponse({"message": "Webhook received"}, status=200)
