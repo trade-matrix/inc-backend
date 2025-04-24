@@ -9,7 +9,7 @@ def send_otp(phone, username):
         'medium': 'sms',
         'message': message+' This is your login OTP code:\n%otp_code%\nPlease do not share this code with anyone.',
         'number': phone,
-        'sender_id': 'TradeMatrix',
+        'sender_id': 'TMHub',
         'type': 'numeric',
         }
 

@@ -7,7 +7,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         # Filter wallets with balances that are multiples of 10
         wallets = Wallet.objects.filter(balance__gt=0, user__verified=True, user__platform='TM')
-        
+         
         # Filter for multiples of 10
         multiples_of_10 = [wallet for wallet in wallets if wallet.balance % 10 == 0]
         

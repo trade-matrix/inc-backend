@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     referal_code = serializers.CharField(required=False, allow_blank=True)
-    
+    vendor_code = serializers.CharField(required=False, allow_blank=True)
     class Meta:
         model = Customer
-        fields = ('username', 'phone_number', 'referal_code')
+        fields = ('username', 'phone_number', 'referal_code','email','vendor_code')
     
     def validate_username(self, value):
         logger.info(f"Original username: {value}")
@@ -49,85 +49,49 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        # Double-check username sanitization before creation
-        validated_data['username'] = self.validate_username(validated_data.get('username', ''))
-
-        password = "defaultpassword"
-        # The username will already have been sanitized by validate_username
-        user = Customer.objects.create(**validated_data, password=password)
-        user.set_password(user.password)
-        user.is_active = False
-        user.platform = 'TM'
-        user.save()
-
-        # Send SMS with OTP
-        message = f"Hello {user.username}, Welcome to Trade-Matrix."
-        data = {
-            'expiry': 5,
-            'length': 6,
-            'medium': 'sms',
-            'message': message + ' This is your verification code:\n%otp_code%\nPlease do not share this code with anyone.',
-            'number': user.phone_number,
-            'sender_id': 'TradeMatrix',
-            'type': 'numeric',
-        }
-
-        headers = {
-            'api-key': os.environ.get('ARK_API_KEY'),
-        }
-
-        url = 'https://sms.arkesel.com/api/otp/generate'
-
+        #Check if user already exists and return that user, if not create a new user
         try:
-            response = requests.post(url, json=data, headers=headers)
-            if response.status_code != 200:
-                user.delete()
-                raise ExternalAPIError(response.status_code, response.json())
+            user = Customer.objects.get(phone_number=validated_data.get('phone_number'))
+            return user
+        except Customer.DoesNotExist:
+            # Double-check username sanitization before creation
+            validated_data['username'] = self.validate_username(validated_data.get('username', ''))
 
-        except requests.RequestException as e:
-            user.delete()
-            raise ExternalAPIError(500, str(e))
+            password = "defaultpassword"
+            # The username will already have been sanitized by validate_username
+            referral_code = validated_data.pop('referal_code', None) # Extract referral code
+            vendor_code = validated_data.pop('vendor_code', None) # Extract vendor code
+            if vendor_code:
+                vendor = Vendor.objects.get(code=vendor_code)
+                validated_data['vendor'] = vendor
+            user = Customer.objects.create(**validated_data, password=password)
+            user.set_password(user.password)
+            user.is_active = False
+            user.platform = 'TM'
+            user.paid = False
+            user.save()
 
-        # Handle referral code if present
-        if validated_data.get('referal_code'):
-            try:
-                referal_user = Customer.objects.get(username=validated_data.get('referal_code'))
-                user.referred_by = referal_user
-                user.save()
+            # Handle referral code if present
+            if referral_code:
+                try:
+                    referal_user = Customer.objects.get(username=referral_code)
+                    user.referred_by = referal_user
+                    user.save()
 
-                # Create a transaction for the referring user
-                transaction = Transaction.objects.create(
-                    user=referal_user, 
-                    amount=10.00, 
-                    status='pending', 
-                    type='referal', 
-                    reffered=user.username, 
-                    image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/male.png'
-                )
+                    # Create a transaction for the referring user
+                    transaction = Transaction.objects.create(
+                        user=referal_user, 
+                        amount=100.00, 
+                        status='pending', 
+                        type='referal', 
+                        reffered=user.username, 
+                        image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/male.png'
+                    )
 
-                # Send transaction to WebSocket
-                channel_layer = get_channel_layer()
-                transaction_data = {
-                    'id': transaction.id,
-                    'user': transaction.user.id,
-                    'amount': transaction.amount,
-                    'status': transaction.status,
-                    'type': transaction.type,
-                    'reffered': transaction.reffered,
-                    'created_at': transaction.created_at.isoformat(),
-                }
-                async_to_sync(channel_layer.group_send)(
-                    f"user_{referal_user.id}",
-                    {
-                        'type': 'send_user_transaction',
-                        'transaction': transaction_data,
-                    }
-                )
+                except Customer.DoesNotExist:
+                    pass # Referral user not found, proceed without referral
 
-            except Customer.DoesNotExist:
-                pass
-
-        return user
+            return user # Return the created user object
 
 class UserLoginSerializer(serializers.Serializer):
     phone_number = serializers.CharField()
@@ -207,8 +171,6 @@ class GCRegisterationSerializer(serializers.ModelSerializer):
         user.is_active = True
         user.platform = 'GC'
         user.save()
-
-        # Send SMS with OTP
 
         # Handle referral code if present
         if validated_data.get('referal_code'):

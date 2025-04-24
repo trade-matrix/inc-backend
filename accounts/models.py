@@ -13,6 +13,15 @@ class Customer(AbstractUser):
     recepient_code = models.CharField(max_length=255, blank=True, null=True)
     withdrawal_reference = models.CharField(max_length=255, blank=True, null=True)
     platform = models.CharField(max_length=255, blank=True, null=True)
+    paid = models.BooleanField(default=False)
+    vendor = models.ForeignKey('Vendor', on_delete=models.SET_NULL, blank=True, null=True)
+
+class Vendor(models.Model):
+    user = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='vendors')
+    code = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.user.username
 
 class Ref(models.Model):
     reference = models.CharField(max_length=255)

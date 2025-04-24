@@ -12,26 +12,90 @@ from .exceptions import ExternalAPIError
 import requests
 from market.models import Wallet, Investment, Transaction, PoolParticipant
 from .utils import send_otp
-from market.utils import send_promo_sms, update_user
+from market.utils import send_promo_sms, update_user, paystack_payment
 from datetime import datetime, timedelta
+from rest_framework.views import APIView
+from rest_framework import serializers
 
-class UserRegistrationView(generics.CreateAPIView):
-    queryset = Customer.objects.all()
-    serializer_class = UserRegistrationSerializer
+class UserRegistrationView(APIView):
     permission_classes = [AllowAny]  # Allow anyone to register
 
     def post(self, request, *args, **kwargs):
+        serializer = UserRegistrationSerializer(data=request.data)
         try:
-            response = super().post(request, *args, **kwargs)
-            if response.status_code == status.HTTP_201_CREATED:
-                user = Customer.objects.get(username=request.data['username'])
-                send_promo_sms(user)
-                user_id = user.id
-                response.data['user_id'] = user_id
-            return response
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save() # Serializer now returns the user object
+            if user.paid:
+                # --- OTP Sending Logic Moved Here ---
+                message = f"Hello {user.username}, Welcome to TM-Hub."
+                otp_data = {
+                    'expiry': 5,
+                    'length': 6,
+                    'medium': 'sms',
+                    'message': message + ' This is your verification code:\n%otp_code%\nPlease do not share this code with anyone.',
+                    'number': user.phone_number,
+                    'sender_id': 'TMHub',
+                    'type': 'numeric',
+                }
+
+                headers = {
+                    'api-key': os.environ.get('ARK_API_KEY'),
+                }
+
+                url = 'https://sms.arkesel.com/api/otp/generate'
+
+                try:
+                    response = requests.post(url, json=otp_data, headers=headers)
+                    response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+                    if response.status_code != 200:
+                        # If OTP fails, delete the created user to avoid dangling accounts
+                        user.delete()
+                        raise ExternalAPIError(response.status_code, response.json())
+                except requests.RequestException as e:
+                    # Network error or other request issue
+                    user.delete()
+                    raise ExternalAPIError(500, str(e))
+                except Exception as e:
+                    # Catch any other unexpected errors during OTP sending
+                    user.delete()
+                    # You might want to log this error differently
+                    raise ExternalAPIError(500, f"An unexpected error occurred during OTP sending: {str(e)}")
+                # --- End of OTP Sending Logic ---
+            else:
+                payment_link = paystack_payment(200, user.email, user.phone_number, 'registration')
+                #award referral bonus
+            if user.referred_by:
+                referrer = user.referred_by
+                referrer_wallet = Wallet.objects.get(user=referrer)
+                referrer_wallet.balance += 100
+                referrer_wallet.save()
+            #award the vendor
+            if user.vendor:
+                vendor = user.vendor
+                #get the vendor's wallet
+                vendor_wallet = Wallet.objects.get(user=vendor.user)
+                vendor_wallet.balance += 20
+                vendor_wallet.save()
+            
+            # Prepare successful response
+            response_data = {
+                "message": "User registered successfully. OTP sent.",
+                "user_id": user.id,
+                "payment_link": payment_link.get("data").get("authorization_url")
+            }
+            return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except serializers.ValidationError as e:
+             # Handle serializer validation errors
+             return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
         except ExternalAPIError as e:
-            # Here you can customize the response as per your frontend requirements
+            # Handle errors raised during OTP sending or potentially referral creation
             return Response({"error": str(e)}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        except Exception as e:
+            # Catch any other unexpected errors during user creation/saving
+            # Log this error for debugging
+            print(f"Unexpected registration error: {str(e)}") 
+            return Response({"error": "An unexpected error occurred during registration."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 class UserOtpVerification(generics.CreateAPIView):
     queryset = Customer.objects.all()
@@ -108,11 +172,20 @@ class UserLoginView(generics.CreateAPIView):
         except Customer.DoesNotExist:
             raise AuthenticationFailed(detail="Invalid Phone Number")
 
-        send_otp(user.phone_number, user.username)
-        data = {
-            "message": "OTP sent",
-            "user_id": user.id
-        }
+        if user.paid:
+            send_otp(user.phone_number, user.username)
+            data = {
+                "message": "OTP sent",
+                "user_id": user.id,
+                "user_paid": user.paid
+            }
+        else:
+            payment_link = paystack_payment(200, user.email, user.phone_number, 'registration')
+            data = {
+                "user_id": user.id,
+                "user_paid": user.paid,
+                "payment_link": payment_link.get("data").get("authorization_url")
+            }
         return Response(data, status=status.HTTP_200_OK)
 
 class UserLogoutView(generics.GenericAPIView):

@@ -11,3 +11,8 @@ class RefAdmin(admin.ModelAdmin):
     list_display = ['reference', 'user']
     search_fields = ['reference']
 admin.site.register(Ref, RefAdmin)
+
+class VendorAdmin(admin.ModelAdmin):
+    list_display = ['user', 'code']
+    search_fields = ['user', 'code']
+admin.site.register(Vendor, VendorAdmin)

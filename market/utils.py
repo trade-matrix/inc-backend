@@ -158,7 +158,7 @@ def check_momo(phone_number, operator):
 
 
 #PAYSTACK FUNCTIONS
-def paystack_payment(amount, title, name):
+def paystack_payment(amount, email, phone_number, type):
     url = 'https://api.paystack.co/transaction/initialize'
     headers = {
         'Content-Type': 'application/json',
@@ -167,11 +167,11 @@ def paystack_payment(amount, title, name):
     print(headers)
     data = {
         "amount": amount*100,
-        "email": f"{name}@email.com",
+        "email": email,
         "reference": str(uuid.uuid4()),
         "metadata": {
-            "investment": title,
-            'username': name
+            'phone_number': phone_number,
+            'type': type
         },
         "channels": ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer", "eft"]
     }
