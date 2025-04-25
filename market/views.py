@@ -708,15 +708,6 @@ class GameView(APIView):
         # We save the wallet state later after calculating potential winnings
         wallet.balance -= amount
 
-        # Create debit transaction record
-        Transaction.objects.create(
-            user=user,
-            amount=-amount, # Negative for debit
-            status='completed',
-            type='game_bet',
-            description=f"Lucky Draw bet ({', '.join(map(str, selection))})"
-        )
-
         # --- Track Daily Entries ---
         today_min = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
         today_max = timezone.now().replace(hour=23, minute=59, second=59, microsecond=999999)
