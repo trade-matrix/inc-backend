@@ -5,6 +5,7 @@ from .models import Customer, Ref, Vendor
 import os
 from rest_framework.authentication import TokenAuthentication,SessionAuthentication
 from rest_framework import generics, status
+from django.db.models import Sum
 from django.contrib.auth import logout,login
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -304,11 +305,18 @@ class UserDetails(generics.GenericAPIView):
         earnings = walet.amount_from_games
         number_of_investments = Investment.objects.filter(user=user).count()
         number_of_refferals = Transaction.objects.filter(user=user, type='referal',status='completed').count()
+        referal_earnings = Transaction.objects.filter(user=user, type='referal',status='completed').aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         eligibility = walet.eligible
         is_user_in_pool = PoolParticipant.objects.filter(user=user).exists()
-        
+        is_vendor = Vendor.objects.filter(user=user).exists()
         acceleration_end_time = datetime(2025, 3, 21, 18, 0).isoformat()  # Set to February 13th, 2025 at 18:00 GMT
-        
+        #check if user is associated with a vendor model
+        try:
+            vendor = Vendor.objects.get(user=user)
+            #check number of users associated with vendor
+            number_of_users = Customer.objects.filter(vendor=vendor).count()
+        except Vendor.DoesNotExist:
+            number_of_users = 0
         data = {
             "user_id": user.id,
             "username": user.username,
@@ -317,10 +325,15 @@ class UserDetails(generics.GenericAPIView):
             "deposit": walet.deposit,
             "investments": number_of_investments,
             "refferals": number_of_refferals,
+            'referal_earnings': referal_earnings,
+            "vendor_sales": number_of_users,
+            "vendor_earnings": number_of_users * 20,
             "eligibility": eligibility,
             "accelerator": walet.valid_for_pool,
             "end_time": acceleration_end_time,
-            "is_user_in_pool": is_user_in_pool
+            "is_user_in_pool": is_user_in_pool,
+            "is_admin": user.is_superuser,
+            "is_vendor": is_vendor
         }
         return Response(data, status=status.HTTP_200_OK)
 
@@ -447,4 +460,23 @@ class UserLoginGoldenCash(generics.CreateAPIView):
         login(request, user)
 
         return Response(data, status=200)
-    
+
+class AdminAnalytics(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication,SessionAuthentication]
+   
+    def get(self, request, *args, **kwargs):
+        data = {
+            "total_users": Customer.objects.count(),
+            "total_vendors": Vendor.objects.count(),
+            "total_platform_revenue": Transaction.objects.filter(type='deposit').aggregate(total_amount=Sum('amount'))['total_amount']- Wallet.objects.all().aggregate(total_amount=Sum('balance'))['total_amount'] or 0,
+            "total_deposits": Transaction.objects.filter(type='deposit').aggregate(total_amount=Sum('amount'))['total_amount'] or 0,
+            "total_withdrawals": Transaction.objects.filter(type='withdraw').aggregate(total_amount=Sum('amount'))['total_amount'] or 0,
+            "total_referrals": Transaction.objects.filter(type='referal').count(),
+            "total_affiliate_users": Customer.objects.filter(affiliate=True).count(),
+            "total_affiliate_earnings": Transaction.objects.filter(type='referal', user__affiliate=True).aggregate(total_amount=Sum('amount'))['total_amount'] or 0,
+            "total_non_affiliate_users": Customer.objects.filter(affiliate=False).count(),
+            "total_non_affiliate_earnings": Wallet.objects.filter(user__affiliate=False).aggregate(total_amount=Sum('balance'))['total_amount'] or 0,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+   

@@ -332,13 +332,19 @@ class WebhookView(APIView):
                         user.verified = True
                         user.is_active = True
                         user.save()
-                        
+                        #Create and update user's wallet
+                        wallet,_ = Wallet.objects.get_or_create(user=user)
+                        wallet.deposit += 200
+                        wallet.balance += 100
+                        wallet.save()
                         # Send OTP
                         send_otp(user.phone_number, user.username)
                         
                         # Handle referral bonus
                         if user.referred_by:
                             referrer = user.referred_by
+                            referrer.affiliate = True
+                            referrer.save()
                             referrer_wallet = Wallet.objects.get(user=referrer)
                             referrer_wallet.balance += 100
                             referrer_wallet.save()
@@ -356,6 +362,7 @@ class WebhookView(APIView):
                 elif type == 'deposit':
                     amount = float(payload['data']['amount'])/100 
                     wallet,_ = Wallet.objects.get_or_create(user=user)
+                    wallet.deposit += amount
                     wallet.balance += amount
                     wallet.save()
                     return Response({"message": "Payment successful"}, status=200)

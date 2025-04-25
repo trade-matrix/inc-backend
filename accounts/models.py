@@ -14,6 +14,7 @@ class Customer(AbstractUser):
     withdrawal_reference = models.CharField(max_length=255, blank=True, null=True)
     platform = models.CharField(max_length=255, blank=True, null=True)
     paid = models.BooleanField(default=False)
+    affiliate = models.BooleanField(default=False)
     vendor = models.ForeignKey('Vendor', on_delete=models.SET_NULL, blank=True, null=True)
 
 class Vendor(models.Model):
