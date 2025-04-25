@@ -471,7 +471,7 @@ class AdminAnalytics(generics.GenericAPIView):
         data = {
             "total_users": Customer.objects.count(),
             "total_vendors": Vendor.objects.count(),
-            "total_platform_revenue": Transaction.objects.filter(type='deposit').aggregate(total_amount=Sum('amount'))['total_amount']- Wallet.objects.all().aggregate(total_amount=Sum('balance'))['total_amount'] or 0,
+            "total_platform_revenue": float(Transaction.objects.filter(type='deposit').aggregate(total_amount=Sum('amount'))['total_amount'])- float(Wallet.objects.all().aggregate(total_amount=Sum('balance'))['total_amount']) or 0,
             "total_deposits": Transaction.objects.filter(type='deposit').aggregate(total_amount=Sum('amount'))['total_amount'] or 0,
             "total_withdrawals": Transaction.objects.filter(type='withdraw').aggregate(total_amount=Sum('amount'))['total_amount'] or 0,
             "total_referrals": Transaction.objects.filter(type='referal').count(),
