@@ -829,11 +829,10 @@ class GameView(APIView):
             user=request.user,
             name='Lucky Draw', # Game name
             selection=json.dumps(selection), # Store selection as JSON string
-            winning_numbers=json.dumps(winning_numbers), # Store winning numbers as JSON string
             amount_bet=amount,
             matches=matches,
             winnings=winnings,
-            active=False # Game instance represents a completed game
+            won=won_game
         )
 
         # --- Send Final Balance Update via WebSocket ---
