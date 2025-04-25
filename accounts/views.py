@@ -257,11 +257,11 @@ class UserCreateReferalLink(generics.GenericAPIView):
             
         user = request.user
         # Check for both null and empty email
-        referal_link = f"https://tm-hub.com/auth/signup/?referral={user.username}"
+        referal_link = f"https://tm-hub.com/signup/?referral={user.username}"
         #Check if user is associated with a vendor model
         try:
             vendor = Vendor.objects.get(user=user)
-            referal_link = f"https://tm-hub.com/auth/signup/?referral={user.username}&vendor={vendor.code}"
+            referal_link = f"https://tm-hub.com/signup/?referral={user.username}&vendor_code={vendor.code}"
         except Vendor.DoesNotExist:
             pass
             
