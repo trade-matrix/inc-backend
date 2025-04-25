@@ -73,17 +73,18 @@ class CreatePaymentLink(APIView):
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     
     def post(self, request, *args, **kwargs):
+        user = request.user
         amount = float(request.data.get('amount'))
         type = request.data.get('type')
-        email = request.data.get('email')
-        phone_number = request.data.get('phone_number')
+        email = user.email
+        phone_number = user.phone_number
         payment_response = paystack_payment(amount, email, phone_number, type)
         if 'error' in payment_response:
             return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
         reference = payment_response['data']['reference']
-        request.user.reference = reference
-        request.user.save()
-        Ref.objects.create(reference=reference, user=request.user)
+        user.reference = reference
+        user.save()
+        Ref.objects.create(reference=reference, user=user)
         data = {
             "payment_response": payment_response,
         }
@@ -343,12 +344,14 @@ class WebhookView(APIView):
                         # Handle referral bonus
                         if user.referred_by:
                             referrer = user.referred_by
-                            referrer.affiliate = True
-                            referrer.save()
+                            if not referrer.affiliate:
+                                referrer.affiliate = True
+                                referrer.save()
                             referrer_wallet = Wallet.objects.get(user=referrer)
                             referrer_wallet.withdrawable += 100
                             referrer_wallet.balance += 100
                             referrer_wallet.save()
+                            Transaction.objects.create(user=referrer, amount=100, status='completed', type='referal', reffered=user.username)
 
                         # Handle vendor bonus
                         if user.vendor:
@@ -366,7 +369,9 @@ class WebhookView(APIView):
                     wallet,_ = Wallet.objects.get_or_create(user=user)
                     wallet.deposit += amount
                     wallet.balance += amount
+                    wallet.withdrawable += amount
                     wallet.save()
+                    Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit')
                     return Response({"message": "Payment successful"}, status=200)
             
             # Return success for other events

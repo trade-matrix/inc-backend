@@ -4,11 +4,10 @@ import os
 from .models import Requested_Withdraw,Transaction,Investment, Wallet, Profit, Pool, PoolParticipant
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from .promo import message_decider
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from celery import shared_task
 import logging
 
 logger = logging.getLogger(__name__)
@@ -334,14 +333,14 @@ def withdraw(user, wallet, amount, operator, phone_number):
                 Requested_Withdraw.objects.create(user=user, amount=amount, phone_number=phone_number, operator=operator)
                 send_sms("Your withdrawal has been initiated successfully. However, it will take a while to be processed. Please be patient.", user.phone_number)
                 #update_user(user.email, "Withdarwal Initiated", "Congratulations! Your withdrawal has been initiated successfully.", "withdraw.html")
-                amin_phone = "0599971083"
-                send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", amin_phone)
+                admin_phone = "0599971083"
+                send_sms(f"Dear Admin,\n{user.username} has initiated a withdrawal of GHS {amount}. Please process it manually.", admin_phone)
                 return True
         else:
             send_sms("Your withdrawal has been processed successfully. Refer more to earn more.", user.phone_number)
             #update_user(user.email, "Congratulations", "Congratulations! Your withdrawal has been processed successfully.", "withdraw_success.html")
         #Create a transaction record
-        Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal', image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/transaction.png')
+        Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal')
         return True 
     else:
         return False

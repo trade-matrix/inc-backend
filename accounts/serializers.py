@@ -75,18 +75,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             if referral_code:
                 try:
                     referal_user = Customer.objects.get(username=referral_code)
-                    user.referred_by = referal_user
-                    user.save()
-
-                    # Create a transaction for the referring user
-                    transaction = Transaction.objects.create(
-                        user=referal_user, 
-                        amount=100.00, 
-                        status='pending', 
-                        type='referal', 
-                        reffered=user.username, 
-                        image='https://darkpass.s3.us-east-005.backblazeb2.com/investment/male.png'
-                    )
+                    if referal_user.paid:
+                        user.referred_by = referal_user
+                        user.save()
+                    else:
+                        user.referred_by = None
+                        user.save()
 
                 except Customer.DoesNotExist:
                     pass # Referral user not found, proceed without referral
