@@ -300,14 +300,14 @@ class WithdrawfromWallet(APIView):
             return Response({"error": "Could not retrieve balance"}, status=status.HTTP_400_BAD_REQUEST)
         data = []
         
-        if wallet.deposit and wallet.balance > 0:
+        if wallet.withdrawable > 0:
             data.append({
                 f"amount1": wallet.withdrawable
             })
             if not float(b) > wallet.withdrawable:
                 return Response(data, status=status.HTTP_400_BAD_REQUEST)
             return Response(data, status=status.HTTP_200_OK)
-        return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "No withdrawable balance available"}, status=status.HTTP_400_BAD_REQUEST)
     
 @method_decorator(csrf_exempt, name='dispatch')
 class WebhookView(APIView):
