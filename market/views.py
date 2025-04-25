@@ -365,6 +365,14 @@ class WebhookView(APIView):
                         logger.error(f"Registration webhook error: {str(e)}")
                         return JsonResponse({"error": str(e)}, status=500)
                 elif type == 'deposit':
+                    try:
+                        user = Customer.objects.get(reference=payload['data']['metadata']['user'])
+                    except Customer.DoesNotExist:
+                        try:
+                            ref = Ref.objects.get(reference=payload['data']['metadata']['user'])
+                            user = ref.user
+                        except Ref.DoesNotExist:
+                            return JsonResponse({"error": "User not found"}, status=404)
                     amount = float(payload['data']['amount'])/100 
                     wallet,_ = Wallet.objects.get_or_create(user=user)
                     wallet.deposit += amount
