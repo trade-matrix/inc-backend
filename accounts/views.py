@@ -257,11 +257,11 @@ class UserCreateReferalLink(generics.GenericAPIView):
             
         user = request.user
         # Check for both null and empty email
-        referal_link = f"https://tm-hub.com/auth/sign-up/?referral={user.username}"
+        referal_link = f"https://tm-hub.com/auth/signup/?referral={user.username}"
         #Check if user is associated with a vendor model
         try:
             vendor = Vendor.objects.get(user=user)
-            referal_link = f"https://tm-hub.com/auth/sign-up/?referral={user.username}&vendor={vendor.code}"
+            referal_link = f"https://tm-hub.com/auth/signup/?referral={user.username}&vendor={vendor.code}"
         except Vendor.DoesNotExist:
             pass
             
@@ -498,4 +498,7 @@ class BecomeVendor(APIView):
         #Create a five digit code starting with username initials of first three letters plus random strings
         code = user.username[:3].upper() + ''.join(random.choices(string.ascii_letters + string.digits, k=2))
         vendor = Vendor.objects.create(user=user, code=code)
+        wallet = Wallet.objects.get(user=user)
+        wallet.balance -= 50
+        wallet.save()
         return Response({"message": "Vendor created successfully"}, status=status.HTTP_201_CREATED)
