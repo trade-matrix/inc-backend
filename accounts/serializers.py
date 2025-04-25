@@ -12,8 +12,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    referal_code = serializers.CharField(required=False, allow_blank=True)
-    vendor_code = serializers.CharField(required=False, allow_blank=True)
+    referal_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    vendor_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     class Meta:
         model = Customer
         fields = ('username', 'phone_number', 'referal_code','email','vendor_code')
