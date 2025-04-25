@@ -332,6 +332,7 @@ class UserDetails(generics.GenericAPIView):
             "vendor_earnings": number_of_users * 20,
             "eligibility": eligibility,
             "accelerator": walet.valid_for_pool,
+            "phone_number": user.phone_number,
             "end_time": acceleration_end_time,
             "is_user_in_pool": is_user_in_pool,
             "is_admin": user.is_superuser,
