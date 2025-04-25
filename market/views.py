@@ -706,7 +706,7 @@ class GameView(APIView):
 
         # --- Deduct Bet Amount (Initial) ---
         # We save the wallet state later after calculating potential winnings
-        wallet.balance -= amount
+        
 
         # --- Track Daily Entries ---
         today_min = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -724,7 +724,7 @@ class GameView(APIView):
         possible_numbers = list(range(MIN_NUMBER, MAX_NUMBER + 1))
 
         # Incentive Check: First 10 entries get a guaranteed 2x win (3 matches)
-        force_win = daily_entries_count < 3
+        force_win = daily_entries_count < 10
 
         if force_win:
             matches = 3
@@ -812,7 +812,9 @@ class GameView(APIView):
         if winnings > 0:
             wallet.balance += winnings
             wallet.withdrawable += winnings # Ensure amount_from_games is not None
-
+        else:
+            wallet.balance -= amount
+            wallet.withdrawable -= amount
         # --- Save Final Wallet State and Game Record ---
         try:
             # Ensure amount_from_games is Decimal before saving
