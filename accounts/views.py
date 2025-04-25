@@ -346,6 +346,7 @@ class DeleteAccount(generics.GenericAPIView):
     def delete(self, request, *args, **kwargs):
         user = request.user
         user.is_active = False
+        user.paid = False
         user.save()
         #Delete user token
         Token.objects.filter(user=user).delete()
