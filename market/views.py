@@ -22,6 +22,9 @@ from django.utils import timezone  # Use Django's timezone utility
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 import logging
+import random
+from decimal import Decimal
+from django.db.models import F # Not used currently, but keep for potential atomic updates
 
 MULTIPLIER_A = 2.0
 MULTIPLIER_B = 1.5
@@ -645,63 +648,230 @@ class CommentView(generics.ListCreateAPIView):
 class GameView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication, SessionAuthentication]
-    serializer_class = GameSerializer
+    # serializer_class = GameSerializer # Removed as we handle validation manually
 
     def post(self, request, *args, **kwargs):
-        wallet = Wallet.objects.get(user=request.user)
-        game_name = request.data.get('name')
-
-        if not game_name:
-            return Response({"message": "Game Name is Empty"}, status=status.HTTP_400_BAD_REQUEST)
-
-        game,_ = Game.objects.get_or_create(
-            name=game_name, user=request.user,
-        )
-        if game.today:
-            return Response({"message": "Game already initiated today"}, status=status.HTTP_400_BAD_REQUEST)
-        if wallet.balance < 10:
-            return Response({"message": "Insufficient funds to play game"}, status=status.HTTP_400_BAD_REQUEST)
-        if wallet.deposit < 10:
-            return Response({"message": "Insufficient deposit to play game"}, status=status.HTTP_400_BAD_REQUEST)
-        if not wallet.eligible:
-            return Response({"message": "Wallet not eligible to play game"}, status=status.HTTP_400_BAD_REQUEST)
-        game.today = True
-        game.created_at = timezone.now()
-        game.active = True
-        game.save()
-        data = {
-            "message": "Game Created",
-            "timestamp": game.created_at,
-            "name": game.name,
-            "active": game.active
-        }
-        return Response(data, status=status.HTTP_200_OK)
-
-    def get(self, request, *args, **kwargs):
         user = request.user
-        now = timezone.now()  # Get current time with timezone awareness
+        try:
+            wallet = Wallet.objects.get(user=user)
+        except Wallet.DoesNotExist:
+            return Response({"error": "User wallet not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Filter the games belonging to the user and the specific names
-        games = Game.objects.filter(user=user, name__in=['Math', 'Prediction'])
-        game_status = {}
+        selection_data = request.data.get('selection') # Expecting a list/array like [1, 5, 10, 25, 30]
+        amount_str = request.data.get('amount')
 
-        for game in games:
-            # Set game inactive if it's been created more than 2 hours ago
-            if game.created_at and game.created_at + timedelta(hours=2) < now:
-                game.active = False
-                game.save()
+        # --- Input Validation ---
+        if not amount_str:
+            return Response({"error": "Amount is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            amount = Decimal(amount_str)
+            if amount <= 0:
+                raise ValueError("Amount must be positive")
+        except (ValueError, TypeError):
+            return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Build the game status dictionary
-            game_status[game.name] = {
-                "active": game.active,
-                "timestamp": game.created_at
+        if not selection_data or not isinstance(selection_data, list):
+             return Response({"error": "Selection must be a list of 5 numbers"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            # Convert selection to integers and validate length/uniqueness/range
+            selection = [int(s) for s in selection_data]
+            if len(selection) != 5:
+                raise ValueError("Selection must contain exactly 5 numbers")
+            if len(set(selection)) != 5:
+                raise ValueError("Selection must contain unique numbers")
+            # Define valid number range (e.g., 1 to 50)
+            MIN_NUMBER = 0
+            MAX_NUMBER = 100 # Define your desired max number here
+            if not all(MIN_NUMBER <= num <= MAX_NUMBER for num in selection):
+                 raise ValueError(f"Numbers must be between {MIN_NUMBER} and {MAX_NUMBER}")
+        except (ValueError, TypeError) as e:
+            return Response({"error": f"Invalid selection: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # --- Check Balance ---
+        if wallet.balance < amount:
+            return Response({"error": "Insufficient funds to play game"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # --- Deduct Bet Amount (Initial) ---
+        # We save the wallet state later after calculating potential winnings
+        wallet.balance -= amount
+
+        # Create debit transaction record
+        Transaction.objects.create(
+            user=user,
+            amount=-amount, # Negative for debit
+            status='completed',
+            type='game_bet',
+            description=f"Lucky Draw bet ({', '.join(map(str, selection))})"
+        )
+
+        # --- Track Daily Entries ---
+        today_min = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_max = timezone.now().replace(hour=23, minute=59, second=59, microsecond=999999)
+        # Count games created today globally before this one
+        daily_entries_count = Game.objects.filter(
+            name='Lucky Draw', # Filter specifically for this game type if needed
+            created_at__range=(today_min, today_max)
+        ).count()
+
+        # --- Game Logic ---
+        matches = 0
+        multiplier = Decimal('0.0')
+        winning_numbers = []
+        possible_numbers = list(range(MIN_NUMBER, MAX_NUMBER + 1))
+
+        # Incentive Check: First 10 entries get a guaranteed 2x win (3 matches)
+        force_win = daily_entries_count < 10
+
+        if force_win:
+            matches = 3
+            multiplier = Decimal('2.0')
+            # Force 3 matches:
+            correct_choices = random.sample(selection, 3)
+            incorrect_choices_needed = 2
+            incorrect_choices = []
+            numbers_not_in_selection = [n for n in possible_numbers if n not in selection]
+
+            # Ensure we can find enough unique numbers outside the user's selection
+            potential_incorrect = [n for n in possible_numbers if n not in correct_choices]
+            if len(potential_incorrect) >= incorrect_choices_needed:
+                 incorrect_choices = random.sample(potential_incorrect, incorrect_choices_needed)
+                 # Ensure the chosen incorrect numbers are not also in the correct_choices (should be guaranteed by the list comprehension)
+                 # and also not in the original user selection if possible
+                 temp_incorrect = []
+                 candidates = [n for n in potential_incorrect if n not in selection]
+                 if len(candidates) >= incorrect_choices_needed:
+                     temp_incorrect = random.sample(candidates, incorrect_choices_needed)
+                 else: # Not enough numbers outside selection, fill with remaining unique possibilities
+                     temp_incorrect = random.sample(potential_incorrect, incorrect_choices_needed)
+                 incorrect_choices = temp_incorrect
+
+            else:
+                 # Extremely unlikely edge case: Cannot find 2 unique numbers not in correct_choices. Log error?
+                 # For now, fallback to standard random numbers? Or maybe guarantee win differently?
+                 # Fallback: just generate 5 random numbers and hope for the best (or handle error)
+                 logger.warning(f"Could not reliably force 3 matches for user {user.id}. Not enough unique numbers.")
+                 # Let's still try to construct *some* winning numbers
+                 winning_numbers = random.sample(possible_numbers, 5) # Fallback, might not give 3 matches
+                 matches = len(set(selection) & set(winning_numbers)) # Recalculate matches
+                 # Re-evaluate multiplier based on actual fallback matches
+                 if matches == 3: multiplier = Decimal('2.0')
+                 elif matches == 4: multiplier = Decimal('4.0')
+                 elif matches == 5: multiplier = Decimal('5.0')
+                 else: multiplier = Decimal('0.0')
+
+
+            if not winning_numbers: # If fallback wasn't triggered
+                winning_numbers = correct_choices + incorrect_choices
+                random.shuffle(winning_numbers)
+
+            message = f"Lucky Draw First {daily_entries_count + 1}/10 Bonus! You matched {matches} numbers." # Indicate bonus attempt
+
+
+        else: # Normal Logic
+            # Generate winning numbers guaranteed NOT to be in the user's selection
+            numbers_not_in_selection = [n for n in possible_numbers if n not in selection]
+            
+            # Check if there are enough unique numbers available outside the user's selection
+            if len(numbers_not_in_selection) < 5:
+                # This is an edge case, shouldn't happen if MAX_NUMBER - MIN_NUMBER + 1 is reasonably larger than 5
+                # Log an error and potentially return an error response or use a fallback strategy
+                logger.error(f"Cannot generate 5 unique winning numbers different from user {user.id}'s selection: {selection}. Available: {numbers_not_in_selection}")
+                # Fallback: Generate completely random numbers (might accidentally match, but it's a fallback)
+                winning_numbers = random.sample(possible_numbers, 5)
+                matches = len(set(selection) & set(winning_numbers))
+            else:
+                winning_numbers = random.sample(numbers_not_in_selection, 5)
+                matches = 0 # By definition, matches will be 0
+
+            # Since we forced no matches in the normal case (unless fallback occurred):
+            if matches == 0:
+                 multiplier = Decimal('0.0')
+                 message = f"Sorry, you matched {matches} numbers. Better luck next time!"
+            # Handle the unlikely fallback case where matches might occur
+            elif matches == 3: 
+                 multiplier = Decimal('2.0')
+                 message = f"Good job! You matched 3 numbers! (Fallback)"
+            elif matches == 4: 
+                 multiplier = Decimal('4.0')
+                 message = f"Excellent! You matched 4 numbers! (Fallback)"
+            elif matches == 5: 
+                 multiplier = Decimal('5.0')
+                 message = f"Wow! You matched all 5 numbers! (Fallback)"
+            # else: # This line is now technically covered by matches == 0 above
+            #     multiplier = Decimal('0.0')
+            #     message = f"Sorry, you matched {matches} numbers. Better luck next time!"
+
+        # --- Calculate Winnings & Update Wallet ---
+        winnings = amount * multiplier
+        won_game = winnings > 0 # Determine if the user won
+
+        if winnings > 0:
+            wallet.balance += winnings
+            wallet.amount_from_games = (wallet.amount_from_games or Decimal('0.0')) + winnings # Ensure amount_from_games is not None
+            # Create credit transaction record
+            Transaction.objects.create(
+                user=user,
+                amount=winnings,
+                status='completed',
+                type='game_win',
+                description=f"Lucky Draw win ({matches} matches)"
+            )
+
+        # --- Save Final Wallet State and Game Record ---
+        try:
+            # Ensure amount_from_games is Decimal before saving
+            if wallet.amount_from_games is None:
+                 wallet.amount_from_games = Decimal('0.0')
+            wallet.save()
+        except Exception as e:
+            logger.error(f"Error saving wallet for user {user.id} after game: {e}")
+            # Consider reverting the bet transaction or handling the error appropriately
+            return Response({"error": "Failed to update wallet."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+        game = Game.objects.create(
+            user=request.user,
+            name='Lucky Draw', # Game name
+            selection=json.dumps(selection), # Store selection as JSON string
+            winning_numbers=json.dumps(winning_numbers), # Store winning numbers as JSON string
+            amount_bet=amount,
+            matches=matches,
+            winnings=winnings,
+            active=False # Game instance represents a completed game
+        )
+
+        # --- Send Final Balance Update via WebSocket ---
+        # (Assuming send_balance_update logic is available or defined elsewhere)
+        try:
+            channel_layer = get_channel_layer()
+            balance_data = {
+                "new_balance": float(wallet.balance),
+                "earnings": float(wallet.amount_from_games)
             }
+            async_to_sync(channel_layer.group_send)(
+                f"user_{user.id}",
+                {
+                    "type": "send_balance_update",
+                    "new_balance": balance_data,
+                }
+            )
+        except Exception as e:
+             logger.error(f"Error sending balance update via WebSocket for user {user.id}: {e}")
+             # Continue execution, but log the error
 
-            # Remove the timestamp if the game is not active
-            if not game.active:
-                game_status[game.name].pop("timestamp", None)
-
-        return Response(game_status, status=status.HTTP_200_OK)
+        # --- Construct Response ---
+        response_data = {
+            "message": message,
+            "user_selection": selection,
+            "winning_numbers": winning_numbers,
+            "matches": matches,
+            "amount_bet": float(amount),
+            "winnings": float(winnings),
+            "new_balance": float(wallet.balance),
+            "timestamp": game.created_at.isoformat(),
+            "won": won_game # Add the won status here
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
 
 class TopEarnersGc(APIView):
     def get(self, request, *args, **kwargs):

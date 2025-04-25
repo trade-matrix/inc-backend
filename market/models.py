@@ -91,10 +91,15 @@ class Requested_Withdraw(models.Model):
         return self.user.username
     
 class Game(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, default='Lucky Draw')
     user = models.ForeignKey(Customer, related_name='players', blank=True, on_delete=models.CASCADE)
+    selection = models.CharField(max_length=255, blank=True, null=True)
     active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=False, blank=True, null=True)
+    won = models.BooleanField(default=False)
+    amount_bet = models.FloatField(default=0.00)
+    winnings = models.FloatField(default=0.00)
+    matches = models.IntegerField(default=0)
     today = models.BooleanField(default=False)
     def __str__(self):
         return self.name
