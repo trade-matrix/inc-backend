@@ -677,7 +677,7 @@ class GameView(APIView):
         if not amount_str:
             return Response({"error": "Amount is required"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            amount = Decimal(amount_str)
+            amount = float(amount_str)
             if amount <= 0:
                 raise ValueError("Amount must be positive")
         except (ValueError, TypeError):
@@ -728,7 +728,7 @@ class GameView(APIView):
 
         # --- Game Logic ---
         matches = 0
-        multiplier = Decimal('0.0')
+        multiplier = 0
         winning_numbers = []
         possible_numbers = list(range(MIN_NUMBER, MAX_NUMBER + 1))
 
@@ -737,7 +737,7 @@ class GameView(APIView):
 
         if force_win:
             matches = 3
-            multiplier = Decimal('2.0')
+            multiplier = 2
             # Force 3 matches:
             correct_choices = random.sample(selection, 3)
             incorrect_choices_needed = 2
@@ -767,10 +767,10 @@ class GameView(APIView):
                  winning_numbers = random.sample(possible_numbers, 5) # Fallback, might not give 3 matches
                  matches = len(set(selection) & set(winning_numbers)) # Recalculate matches
                  # Re-evaluate multiplier based on actual fallback matches
-                 if matches == 3: multiplier = Decimal('2.0')
-                 elif matches == 4: multiplier = Decimal('4.0')
-                 elif matches == 5: multiplier = Decimal('5.0')
-                 else: multiplier = Decimal('0.0')
+                 if matches == 3: multiplier = 2
+                 elif matches == 4: multiplier = 4
+                 elif matches == 5: multiplier = 5
+                 else: multiplier = 0
 
 
             if not winning_numbers: # If fallback wasn't triggered
@@ -798,17 +798,17 @@ class GameView(APIView):
 
             # Since we forced no matches in the normal case (unless fallback occurred):
             if matches == 0:
-                 multiplier = Decimal('0.0')
+                 multiplier = 0
                  message = f"Sorry, you matched {matches} numbers. Better luck next time!"
             # Handle the unlikely fallback case where matches might occur
             elif matches == 3: 
-                 multiplier = Decimal('2.0')
+                 multiplier = 2
                  message = f"Good job! You matched 3 numbers! (Fallback)"
             elif matches == 4: 
-                 multiplier = Decimal('4.0')
+                 multiplier = 4
                  message = f"Excellent! You matched 4 numbers! (Fallback)"
             elif matches == 5: 
-                 multiplier = Decimal('5.0')
+                 multiplier = 5
                  message = f"Wow! You matched all 5 numbers! (Fallback)"
             # else: # This line is now technically covered by matches == 0 above
             #     multiplier = Decimal('0.0')
@@ -820,7 +820,7 @@ class GameView(APIView):
 
         if winnings > 0:
             wallet.balance += winnings
-            wallet.amount_from_games = (wallet.amount_from_games or Decimal('0.0')) + winnings # Ensure amount_from_games is not None
+            wallet.amount_from_games = (wallet.amount_from_games or 0) + winnings # Ensure amount_from_games is not None
             # Create credit transaction record
             Transaction.objects.create(
                 user=user,
@@ -834,7 +834,7 @@ class GameView(APIView):
         try:
             # Ensure amount_from_games is Decimal before saving
             if wallet.amount_from_games is None:
-                 wallet.amount_from_games = Decimal('0.0')
+                 wallet.amount_from_games = 0
             wallet.save()
         except Exception as e:
             logger.error(f"Error saving wallet for user {user.id} after game: {e}")
