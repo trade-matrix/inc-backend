@@ -316,7 +316,9 @@ def withdraw_optout(user,wallet, amount, operator, phone_number):
         return False
 
 def withdraw(user, wallet, amount, operator, phone_number):
-    if wallet.balance >= float(amount):
+    if wallet.withdrawable >= float(amount):
+        wallet.withdrawable -= float(amount)
+        wallet.withdrawable = max(wallet.withdrawable, 0)
         wallet.balance -= float(amount)
         wallet.balance = max(wallet.balance, 0)
         wallet.amount_from_games += float(amount)

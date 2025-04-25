@@ -298,9 +298,9 @@ class WithdrawfromWallet(APIView):
         
         if wallet.deposit and wallet.balance > 0:
             data.append({
-                f"amount1": wallet.balance
+                f"amount1": wallet.withdrawable
             })
-            if not float(b) > wallet.balance:
+            if not float(b) > wallet.withdrawable:
                 return Response(data, status=status.HTTP_400_BAD_REQUEST)
             return Response(data, status=status.HTTP_200_OK)
         return Response({"error": "No deposit available for withdrawal"}, status=status.HTTP_400_BAD_REQUEST)
@@ -346,6 +346,7 @@ class WebhookView(APIView):
                             referrer.affiliate = True
                             referrer.save()
                             referrer_wallet = Wallet.objects.get(user=referrer)
+                            referrer_wallet.withdrawable += 100
                             referrer_wallet.balance += 100
                             referrer_wallet.save()
 
@@ -354,6 +355,7 @@ class WebhookView(APIView):
                             vendor = user.vendor
                             vendor_wallet = Wallet.objects.get(user=vendor.user)
                             vendor_wallet.balance += 20
+                            vendor_wallet.withdrawable += 20
                             vendor_wallet.save()
                             
                     except Exception as e:

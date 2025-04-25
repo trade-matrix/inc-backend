@@ -19,6 +19,7 @@ class Wallet(models.Model):
     user = models.OneToOneField(Customer, on_delete=models.CASCADE)
     deposit = models.FloatField(default=0.00)
     balance = models.FloatField(default=0.00)
+    withdrawable = models.FloatField(default=0.00)
     amount_from_games = models.FloatField(default=0.00)
     deposit_used = models.BooleanField(default=False)
     tier = models.IntegerField(default=1)

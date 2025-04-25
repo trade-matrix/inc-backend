@@ -15,7 +15,7 @@ from .exceptions import ExternalAPIError
 import requests
 from market.models import Wallet, Investment, Transaction, PoolParticipant
 from .utils import send_otp
-from market.utils import send_promo_sms, update_user, paystack_payment
+from market.utils import send_promo_sms, update_user, paystack_payment, paystack_balance_check
 from datetime import datetime, timedelta
 from rest_framework.views import APIView
 from rest_framework import serializers
@@ -472,17 +472,20 @@ class AdminAnalytics(generics.GenericAPIView):
     authentication_classes = [TokenAuthentication,SessionAuthentication]
    
     def get(self, request, *args, **kwargs):
+        total_withdraws = Transaction.objects.filter(type='withdraw').aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        total_deposits = Wallet.objects.all().aggregate(total_amount=Sum('deposit'))['total_amount'] or 0
         data = {
             "total_users": Customer.objects.count(),
             "total_vendors": Vendor.objects.count(),
-            "total_platform_revenue": float(Wallet.objects.all().aggregate(total_amount=Sum('deposit'))['total_amount'])- float(Wallet.objects.all().aggregate(total_amount=Sum('balance'))['total_amount']) or 0,
-            "total_deposits": Transaction.objects.filter(type='deposit').aggregate(total_amount=Sum('amount'))['total_amount'] or 0,
-            "total_withdrawals": Transaction.objects.filter(type='withdraw').aggregate(total_amount=Sum('amount'))['total_amount'] or 0,
+            "total_platform_revenue": float(total_deposits)- (float(total_withdraws)+ float(Wallet.objects.all().aggregate(total_amount=Sum('withdrawable'))['total_amount'] or 0)) or 0,
+            "total_deposits": total_deposits,
+            "total_withdrawals": total_withdraws,
             "total_referrals": Transaction.objects.filter(type='referal').count(),
             "total_affiliate_users": Customer.objects.filter(affiliate=True).count(),
             "total_affiliate_earnings": Transaction.objects.filter(type='referal', user__affiliate=True).aggregate(total_amount=Sum('amount'))['total_amount'] or 0,
             "total_non_affiliate_users": Customer.objects.filter(affiliate=False).count(),
-            "total_non_affiliate_earnings": Wallet.objects.filter(user__affiliate=False).aggregate(total_amount=Sum('balance'))['total_amount'] or 0,
+            "total_non_affiliate_earnings": Wallet.objects.filter(user__affiliate=False).aggregate(total_amount=Sum('withdrawable'))['total_amount'] or 0,
+            "paystack_balance": paystack_balance_check().get("data").get("balance")
         }
         return Response(data, status=status.HTTP_200_OK)
 
