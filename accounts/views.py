@@ -345,7 +345,10 @@ class DeleteAccount(generics.GenericAPIView):
     authentication_classes = [TokenAuthentication,SessionAuthentication]
     def delete(self, request, *args, **kwargs):
         user = request.user
-        user.delete()
+        user.is_active = False
+        user.save()
+        #Delete user token
+        Token.objects.filter(user=user).delete()
         return Response({"message": "Account deleted successfully"}, status=status.HTTP_200_OK)
 
 class NumberofReferralsRequired(generics.GenericAPIView):
