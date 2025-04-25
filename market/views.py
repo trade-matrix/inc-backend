@@ -811,7 +811,7 @@ class GameView(APIView):
 
         if winnings > 0:
             wallet.balance += winnings
-            wallet.amount_from_games = (wallet.amount_from_games or 0) + winnings # Ensure amount_from_games is not None
+            wallet.withdrawable += winnings # Ensure amount_from_games is not None
 
         # --- Save Final Wallet State and Game Record ---
         try:
