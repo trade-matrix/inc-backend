@@ -863,7 +863,6 @@ class GameView(APIView):
             "amount_bet": float(amount),
             "winnings": float(winnings),
             "new_balance": float(wallet.balance),
-            "timestamp": game.created_at.isoformat(),
             "won": won_game # Add the won status here
         }
         return Response(response_data, status=status.HTTP_200_OK)
