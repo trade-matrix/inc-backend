@@ -486,7 +486,7 @@ class AdminAnalytics(generics.GenericAPIView):
             "total_affiliate_earnings": Transaction.objects.filter(type='referal', user__affiliate=True).aggregate(total_amount=Sum('amount'))['total_amount'] or 0,
             "total_non_affiliate_users": Customer.objects.filter(affiliate=False).count(),
             "total_non_affiliate_earnings": Wallet.objects.filter(user__affiliate=False).aggregate(total_amount=Sum('withdrawable'))['total_amount'] or 0,
-            "paystack_balance": paystack_balance_check().get("data").get("balance")
+            #"paystack_balance": paystack_balance_check().get("data").get("balance")
         }
         return Response(data, status=status.HTTP_200_OK)
 
