@@ -119,7 +119,7 @@ def send_sms(message, number):
         "action": "send-sms",
         "api_key": os.environ.get("ARK_API_KEY"),
         "to": number,
-        "from": "TradeMatrix",
+        "from": "TMHub",
         "sms": message
     }
     # Send HTTP GET request
