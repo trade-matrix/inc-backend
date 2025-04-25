@@ -724,7 +724,7 @@ class GameView(APIView):
         possible_numbers = list(range(MIN_NUMBER, MAX_NUMBER + 1))
 
         # Incentive Check: First 10 entries get a guaranteed 2x win (3 matches)
-        force_win = daily_entries_count < 10
+        force_win = daily_entries_count < 3
 
         if force_win:
             matches = 3
@@ -812,14 +812,6 @@ class GameView(APIView):
         if winnings > 0:
             wallet.balance += winnings
             wallet.amount_from_games = (wallet.amount_from_games or 0) + winnings # Ensure amount_from_games is not None
-            # Create credit transaction record
-            Transaction.objects.create(
-                user=user,
-                amount=winnings,
-                status='completed',
-                type='game_win',
-                description=f"Lucky Draw win ({matches} matches)"
-            )
 
         # --- Save Final Wallet State and Game Record ---
         try:
