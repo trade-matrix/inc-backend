@@ -17,4 +17,5 @@ urlpatterns = [
     path('check-referal/', NumberofReferralsRequired.as_view(), name='check-referal'),
     path('register/gc/', RegisteronGoldenCash.as_view(), name='register-gc'),
     path('login/gc/', UserLoginGoldenCash.as_view(), name='login-gc'),
+    path('become-vendor/', BecomeVendor.as_view(), name='become-vendor'),
 ]

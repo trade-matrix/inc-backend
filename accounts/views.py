@@ -2,6 +2,8 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from .serializers import UserLoginSerializer, UserRegistrationSerializer, UserOtpVerificationSerializer, UserResendOtpSerializer, InvestmentSerializer, ReferredUserSerializer, GCRegisterationSerializer, GCLoginSerializer
 from .models import Customer, Ref, Vendor
+import random
+import string
 import os
 from rest_framework.authentication import TokenAuthentication,SessionAuthentication
 from rest_framework import generics, status
@@ -479,4 +481,20 @@ class AdminAnalytics(generics.GenericAPIView):
             "total_non_affiliate_earnings": Wallet.objects.filter(user__affiliate=False).aggregate(total_amount=Sum('balance'))['total_amount'] or 0,
         }
         return Response(data, status=status.HTTP_200_OK)
-   
+
+class BecomeVendor(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication,SessionAuthentication]
+
+    def post(self, request, *args, **kwargs):
+        #Check if user is already a vendor
+        if Vendor.objects.filter(user=request.user).exists():
+            return Response({"message": "User is already a vendor"}, status=status.HTTP_400_BAD_REQUEST)
+        #Check balance
+        if Wallet.objects.get(user=request.user).balance < 50:
+            return Response({"message": "Insufficient balance"}, status=status.HTTP_400_BAD_REQUEST)
+        user = request.user
+        #Create a five digit code starting with username initials of first three letters plus random strings
+        code = user.username[:3].upper() + ''.join(random.choices(string.ascii_letters + string.digits, k=2))
+        vendor = Vendor.objects.create(user=user, code=code)
+        return Response({"message": "Vendor created successfully"}, status=status.HTTP_201_CREATED)
