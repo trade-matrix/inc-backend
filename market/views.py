@@ -368,22 +368,35 @@ class WebhookView(APIView):
                         logger.error(f"Registration webhook error: {str(e)}")
                         return JsonResponse({"error": str(e)}, status=500)
                 elif type == 'deposit':
+                    # Use the reference from the webhook payload
+                    reference = payload['data']['reference']
                     try:
-                        user = Customer.objects.get(reference=payload['data']['metadata']['user'])
-                    except Customer.DoesNotExist:
-                        try:
-                            ref = Ref.objects.get(reference=payload['data']['metadata']['user'])
-                            user = ref.user
-                        except Ref.DoesNotExist:
-                            return JsonResponse({"error": "User not found"}, status=404)
-                    amount = float(payload['data']['amount'])/100 
-                    wallet,_ = Wallet.objects.get_or_create(user=user)
-                    wallet.deposit += amount
+                        # Find the Ref object using the reference
+                        ref = Ref.objects.get(reference=reference)
+                        user = ref.user
+                    except Ref.DoesNotExist:
+                        # Log the reference that wasn't found for debugging
+                        logger.error(f"Webhook error: Ref object not found for reference {reference}")
+                        return JsonResponse({"error": "User reference not found"}, status=404)
+                    except Exception as e:
+                        # Catch any other unexpected errors during user lookup
+                        logger.error(f"Webhook error during user lookup for reference {reference}: {str(e)}")
+                        return JsonResponse({"error": "Failed to process deposit webhook"}, status=500)
+
+                    # Proceed with deposit logic only if user was found
+                    amount = float(payload['data']['amount'])/100
+                    # Ensure wallet exists or create it
+                    wallet, created = Wallet.objects.get_or_create(user=user)
+                    # Update wallet balance
+                    wallet.deposit += amount # Ensure Decimal type
                     wallet.balance += amount
                     wallet.withdrawable += amount
                     wallet.save()
-                    Transaction.objects.create(user=user, amount=amount, status='completed', type='deposit')
-                    return Response({"message": "Payment successful"}, status=200)
+                    # Record transaction
+                    Transaction.objects.create(user=user, amount=Decimal(str(amount)), status='completed', type='deposit')
+
+
+                    return Response({"message": "Deposit successful"}, status=200)
             
             # Return success for other events
             return JsonResponse({"message": "Webhook received"}, status=200)
