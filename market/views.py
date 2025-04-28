@@ -843,7 +843,6 @@ class GameView(APIView):
             user=request.user,
             name='Lucky Draw',
             selection=json.dumps(selection),
-            winning_numbers=json.dumps(winning_numbers),
             amount_bet=amount,
             matches=matches,
             winnings=winnings,
@@ -852,22 +851,7 @@ class GameView(APIView):
         )
 
         # --- Send Final Balance Update via WebSocket --- 
-        try:
-            channel_layer = get_channel_layer()
-            balance_data = {
-                "new_balance": float(wallet.balance),
-                "earnings": float(wallet.amount_from_games or 0.0) # Use existing field or 0
-            }
-            async_to_sync(channel_layer.group_send)(
-                f"user_{user.id}",
-                {
-                    "type": "send_balance_update",
-                    "new_balance": balance_data,
-                }
-            )
-        except Exception as e:
-            logger.error(f"Error sending balance update via WebSocket for user {user.id}: {e}")
-
+        
         # --- Construct Response --- 
         message = f"Matched {matches} numbers."
         if won_game:
