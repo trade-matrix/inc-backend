@@ -25,6 +25,7 @@ import logging
 import random
 from decimal import Decimal
 from django.db.models import F # Not used currently, but keep for potential atomic updates
+from django.db import transaction # Import transaction
 
 MULTIPLIER_A = 2.0
 MULTIPLIER_B = 1.5
@@ -661,22 +662,67 @@ class CommentView(generics.ListCreateAPIView):
 class GameView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication, SessionAuthentication]
-    # serializer_class = GameSerializer # Removed as we handle validation manually
+    # serializer_class = GameSerializer # Keep removed
 
+    # --- Helper functions for generating numbers ---
+    def _generate_matching_numbers(self, selection, possible_numbers, num_matches):
+        """Generates winning numbers with a specific number of matches."""
+        if num_matches > len(selection) or num_matches > 5 or num_matches < 0:
+            num_matches = 0 # Default to no match if invalid num_matches
+
+        if num_matches == 0:
+             return self._generate_non_matching_numbers(selection, possible_numbers)
+
+        correct_choices = random.sample(selection, num_matches)
+        incorrect_choices_needed = 5 - num_matches
+        incorrect_choices = []
+
+        # Find numbers available for incorrect choices
+        potential_incorrect = [n for n in possible_numbers if n not in correct_choices and n not in selection]
+        
+        if len(potential_incorrect) >= incorrect_choices_needed:
+            incorrect_choices = random.sample(potential_incorrect, incorrect_choices_needed)
+        else:
+            # Fallback: If not enough numbers outside selection, pick from any number not in correct_choices
+            potential_incorrect_fallback = [n for n in possible_numbers if n not in correct_choices]
+            if len(potential_incorrect_fallback) >= incorrect_choices_needed:
+                 incorrect_choices = random.sample(potential_incorrect_fallback, incorrect_choices_needed)
+            else:
+                 # Extremely unlikely: Can't even find 5 unique numbers total. Log and return random.
+                 logger.error(f"Cannot generate {incorrect_choices_needed} unique incorrect choices.")
+                 return random.sample(possible_numbers, 5)
+
+        winning_numbers = correct_choices + incorrect_choices
+        random.shuffle(winning_numbers)
+        return winning_numbers
+
+    def _generate_non_matching_numbers(self, selection, possible_numbers):
+        """Generates winning numbers guaranteed not to match the selection."""
+        numbers_not_in_selection = [n for n in possible_numbers if n not in selection]
+        if len(numbers_not_in_selection) < 5:
+            logger.error(f"Cannot generate 5 unique non-matching numbers for selection {selection}. Available: {numbers_not_in_selection}")
+            # Fallback: return completely random numbers
+            return random.sample(possible_numbers, 5)
+        return random.sample(numbers_not_in_selection, 5)
+    # --- End Helper Functions ---
+
+    @transaction.atomic # Wrap the whole process in a transaction
     def post(self, request, *args, **kwargs):
         user = request.user
         try:
-            wallet = Wallet.objects.get(user=user)
+            # Use select_for_update to lock the wallet row during the transaction
+            wallet = Wallet.objects.select_for_update().get(user=user)
         except Wallet.DoesNotExist:
             return Response({"error": "User wallet not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        selection_data = request.data.get('selection') # Expecting a list/array like [1, 5, 10, 25, 30]
+        selection_data = request.data.get('selection')
         amount_str = request.data.get('amount')
 
         # --- Input Validation ---
         if not amount_str:
             return Response({"error": "Amount is required"}, status=status.HTTP_400_BAD_REQUEST)
         try:
+            # Use Decimal for monetary values
             amount = float(amount_str)
             if amount <= 0:
                 raise ValueError("Amount must be positive")
@@ -684,166 +730,133 @@ class GameView(APIView):
             return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
 
         if not selection_data or not isinstance(selection_data, list):
-             return Response({"error": "Selection must be a list of 5 numbers"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Selection must be a list of 5 numbers"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            # Convert selection to integers and validate length/uniqueness/range
             selection = [int(s) for s in selection_data]
-            if len(selection) != 5:
-                raise ValueError("Selection must contain exactly 5 numbers")
-            if len(set(selection)) != 5:
-                raise ValueError("Selection must contain unique numbers")
-            # Define valid number range (e.g., 1 to 50)
-            MIN_NUMBER = 0
-            MAX_NUMBER = 100 # Define your desired max number here
+            if len(selection) != 5 or len(set(selection)) != 5:
+                raise ValueError("Selection must be 5 unique numbers")
+            # Define valid number range (adjust as needed)
+            MIN_NUMBER = 1
+            MAX_NUMBER = 30
             if not all(MIN_NUMBER <= num <= MAX_NUMBER for num in selection):
-                 raise ValueError(f"Numbers must be between {MIN_NUMBER} and {MAX_NUMBER}")
+                raise ValueError(f"Numbers must be between {MIN_NUMBER} and {MAX_NUMBER}")
+            possible_numbers = list(range(MIN_NUMBER, MAX_NUMBER + 1))
         except (ValueError, TypeError) as e:
             return Response({"error": f"Invalid selection: {e}"}, status=status.HTTP_400_BAD_REQUEST)
 
         # --- Check Balance ---
         if wallet.balance < amount:
-            return Response({"error": "Insufficient funds to play game"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # --- Deduct Bet Amount (Initial) ---
-        # We save the wallet state later after calculating potential winnings
-        
+        # --- Deduct Bet Amount & Create Bet Transaction --- 
+        # This happens *before* determining outcome
 
-        # --- Track Daily Entries ---
-        today_min = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        today_max = timezone.now().replace(hour=23, minute=59, second=59, microsecond=999999)
-        # Count games created today globally before this one
-        daily_entries_count = Game.objects.filter(
-            name='Lucky Draw', # Filter specifically for this game type if needed
-            created_at__range=(today_min, today_max)
-        ).count()
-
-        # --- Game Logic ---
+        # --- Determine Game Logic Path & Outcome --- 
+        user_updated = False
+        force_reason = "Normal Logic"
         matches = 0
         multiplier = 0
         winning_numbers = []
-        possible_numbers = list(range(MIN_NUMBER, MAX_NUMBER + 1))
 
-        # Incentive Check: First 10 entries get a guaranteed 2x win (3 matches)
-        force_win = daily_entries_count < 10
-
-        if force_win:
-            matches = 3
+        # Calculate excess balance (handle potential None for withdrawable)
+        withdrawable_balance = wallet.withdrawable or 0
+        excess_balance = wallet.balance # Balance *before* potential winnings, but after deduction
+        excess_balance = excess_balance - withdrawable_balance
+        
+        # Path 1: First Play Incentive (< 20 GHS stake)
+        if not user.has_played_lucky_draw and amount < 20:
+            matches = 3 # Force 3 matches for 2x win
             multiplier = 2
-            # Force 3 matches:
-            correct_choices = random.sample(selection, 3)
-            incorrect_choices_needed = 2
-            incorrect_choices = []
-            numbers_not_in_selection = [n for n in possible_numbers if n not in selection]
+            winning_numbers = self._generate_matching_numbers(selection, possible_numbers, 3)
+            user.has_played_lucky_draw = True
+            user.in_depletion_phase = True # Enter depletion phase after first win
+            user_updated = True
+            force_reason = "First Play Win (<20 GHS)"
 
-            # Ensure we can find enough unique numbers outside the user's selection
-            potential_incorrect = [n for n in possible_numbers if n not in correct_choices]
-            if len(potential_incorrect) >= incorrect_choices_needed:
-                 incorrect_choices = random.sample(potential_incorrect, incorrect_choices_needed)
-                 # Ensure the chosen incorrect numbers are not also in the correct_choices (should be guaranteed by the list comprehension)
-                 # and also not in the original user selection if possible
-                 temp_incorrect = []
-                 candidates = [n for n in potential_incorrect if n not in selection]
-                 if len(candidates) >= incorrect_choices_needed:
-                     temp_incorrect = random.sample(candidates, incorrect_choices_needed)
-                 else: # Not enough numbers outside selection, fill with remaining unique possibilities
-                     temp_incorrect = random.sample(potential_incorrect, incorrect_choices_needed)
-                 incorrect_choices = temp_incorrect
+        # Path 2: Balance Depletion Phase (if active and excess > 0)
+        elif user.in_depletion_phase and excess_balance > 0:
+            matches = 0 # Force loss
+            multiplier = 0
+            winning_numbers = self._generate_non_matching_numbers(selection, possible_numbers)
+            force_reason = "Depletion Phase Loss"
+            # Check if this loss depletes the remaining excess balance
+            if excess_balance <= 0: # Note: excess_balance already reflects the bet deduction
+                user.in_depletion_phase = False
+                user_updated = True
+                force_reason = "Depletion Phase Ended"
+            # Mark as played if somehow they entered depletion without playing
+            if not user.has_played_lucky_draw:
+                 user.has_played_lucky_draw = True
+                 user_updated = True
 
-            else:
-                 # Extremely unlikely edge case: Cannot find 2 unique numbers not in correct_choices. Log error?
-                 # For now, fallback to standard random numbers? Or maybe guarantee win differently?
-                 # Fallback: just generate 5 random numbers and hope for the best (or handle error)
-                 logger.warning(f"Could not reliably force 3 matches for user {user.id}. Not enough unique numbers.")
-                 # Let's still try to construct *some* winning numbers
-                 winning_numbers = random.sample(possible_numbers, 5) # Fallback, might not give 3 matches
-                 matches = len(set(selection) & set(winning_numbers)) # Recalculate matches
-                 # Re-evaluate multiplier based on actual fallback matches
-                 if matches == 3: multiplier = 2
-                 elif matches == 4: multiplier = 4
-                 elif matches == 5: multiplier = 5
-                 else: multiplier = 0
+        # Path 3: Normal Game Cycle Logic
+        else:
+             # Ensure user is marked as played if they started with stake >= 20 or finished depletion
+            if not user.has_played_lucky_draw:
+                user.has_played_lucky_draw = True
+                user_updated = True
+            if user.in_depletion_phase: # Ensure depletion is turned off if excess balance hit 0
+                 user.in_depletion_phase = False
+                 user_updated = True
+                 
+            # Determine position in the daily 20-game cycle
+            game_count_today = Game.objects.filter(
+                name='Lucky Draw',
+                created_at__date=timezone.now().date()
+            ).count()
+            position_in_cycle = game_count_today % 20 # 0-19
 
+            # First 5 positions in the cycle (0-4) win (2x)
+            if position_in_cycle < 5:
+                matches = 3 # 2x win
+                multiplier = 2
+                winning_numbers = self._generate_matching_numbers(selection, possible_numbers, 3)
+                force_reason = f"Normal Cycle Win (Pos {position_in_cycle}/20)"
+            else: # Positions 5-19 lose
+                matches = 0 # Force loss
+                multiplier = 0
+                winning_numbers = self._generate_non_matching_numbers(selection, possible_numbers)
+                force_reason = f"Normal Cycle Loss (Pos {position_in_cycle}/20)"
 
-            if not winning_numbers: # If fallback wasn't triggered
-                winning_numbers = correct_choices + incorrect_choices
-                random.shuffle(winning_numbers)
+        # Save user state changes if any occurred
+        if user_updated:
+            user.save()
 
-            message = f"Lucky Draw First {daily_entries_count + 1}/10 Bonus! You matched {matches} numbers." # Indicate bonus attempt
-
-
-        else: # Normal Logic
-            # Generate winning numbers guaranteed NOT to be in the user's selection
-            numbers_not_in_selection = [n for n in possible_numbers if n not in selection]
-            
-            # Check if there are enough unique numbers available outside the user's selection
-            if len(numbers_not_in_selection) < 5:
-                # This is an edge case, shouldn't happen if MAX_NUMBER - MIN_NUMBER + 1 is reasonably larger than 5
-                # Log an error and potentially return an error response or use a fallback strategy
-                logger.error(f"Cannot generate 5 unique winning numbers different from user {user.id}'s selection: {selection}. Available: {numbers_not_in_selection}")
-                # Fallback: Generate completely random numbers (might accidentally match, but it's a fallback)
-                winning_numbers = random.sample(possible_numbers, 5)
-                matches = len(set(selection) & set(winning_numbers))
-            else:
-                winning_numbers = random.sample(numbers_not_in_selection, 5)
-                matches = 0 # By definition, matches will be 0
-
-            # Since we forced no matches in the normal case (unless fallback occurred):
-            if matches == 0:
-                 multiplier = 0
-                 message = f"Sorry, you matched {matches} numbers. Better luck next time!"
-            # Handle the unlikely fallback case where matches might occur
-            elif matches == 3: 
-                 multiplier = 2
-                 message = f"Good job! You matched 3 numbers! (Fallback)"
-            elif matches == 4: 
-                 multiplier = 4
-                 message = f"Excellent! You matched 4 numbers! (Fallback)"
-            elif matches == 5: 
-                 multiplier = 5
-                 message = f"Wow! You matched all 5 numbers! (Fallback)"
-            # else: # This line is now technically covered by matches == 0 above
-            #     multiplier = Decimal('0.0')
-            #     message = f"Sorry, you matched {matches} numbers. Better luck next time!"
-
-        # --- Calculate Winnings & Update Wallet ---
+        # --- Calculate Winnings & Update Wallet/Transaction --- 
         winnings = amount * multiplier
-        won_game = winnings > 0 # Determine if the user won
+        won_game = winnings > 0
 
-        if winnings > 0:
-            wallet.balance += winnings
-            wallet.withdrawable += winnings # Ensure amount_from_games is not None
+        if won_game:
+            # Add winnings back to balance (bet was already deducted)
+            wallet.balance += winnings 
+            # Add to game earnings tracker
+            wallet.amount_from_games = (wallet.amount_from_games or 0) + winnings
+
         else:
             wallet.balance -= amount
-            wallet.withdrawable -= amount
-        # --- Save Final Wallet State and Game Record ---
-        try:
-            # Ensure amount_from_games is Decimal before saving
-            if wallet.amount_from_games is None:
-                 wallet.amount_from_games = 0
-            wallet.save()
-        except Exception as e:
-            logger.error(f"Error saving wallet for user {user.id} after game: {e}")
-            # Consider reverting the bet transaction or handling the error appropriately
-            return Response({"error": "Failed to update wallet."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        wallet.save()
+        # else: Wallet was already saved after bet deduction
 
-
-        game = Game.objects.create(
+        # --- Create Game Record --- 
+        # Make sure Game model has fields: name, selection, winning_numbers, amount_bet, matches, winnings, won, forced_win_reason (optional)
+        Game.objects.create(
             user=request.user,
-            name='Lucky Draw', # Game name
-            selection=json.dumps(selection), # Store selection as JSON string
+            name='Lucky Draw',
+            selection=json.dumps(selection),
+            winning_numbers=json.dumps(winning_numbers),
             amount_bet=amount,
             matches=matches,
             winnings=winnings,
-            won=won_game
+            won=won_game,
+            # forced_win_reason=force_reason # Optional: Add this field to Game model if needed for tracking
         )
 
-        # --- Send Final Balance Update via WebSocket ---
-        # (Assuming send_balance_update logic is available or defined elsewhere)
+        # --- Send Final Balance Update via WebSocket --- 
         try:
             channel_layer = get_channel_layer()
             balance_data = {
                 "new_balance": float(wallet.balance),
-                "earnings": float(wallet.amount_from_games)
+                "earnings": float(wallet.amount_from_games or 0.0) # Use existing field or 0
             }
             async_to_sync(channel_layer.group_send)(
                 f"user_{user.id}",
@@ -853,10 +866,15 @@ class GameView(APIView):
                 }
             )
         except Exception as e:
-             logger.error(f"Error sending balance update via WebSocket for user {user.id}: {e}")
-             # Continue execution, but log the error
+            logger.error(f"Error sending balance update via WebSocket for user {user.id}: {e}")
 
-        # --- Construct Response ---
+        # --- Construct Response --- 
+        message = f"Matched {matches} numbers."
+        if won_game:
+            message += f" You won GHS {winnings:.2f}! ({force_reason})"
+        else:
+            message += f" Better luck next time! ({force_reason})"
+            
         response_data = {
             "message": message,
             "user_selection": selection,
@@ -865,7 +883,8 @@ class GameView(APIView):
             "amount_bet": float(amount),
             "winnings": float(winnings),
             "new_balance": float(wallet.balance),
-            "won": won_game # Add the won status here
+            "won": won_game,
+            #"game_logic_reason": force_reason # Added for clarity
         }
         return Response(response_data, status=status.HTTP_200_OK)
 
