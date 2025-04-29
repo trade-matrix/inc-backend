@@ -697,13 +697,17 @@ class GameView(APIView):
         return winning_numbers
 
     def _generate_non_matching_numbers(self, selection, possible_numbers):
-        """Generates winning numbers guaranteed not to match the selection."""
-        numbers_not_in_selection = [n for n in possible_numbers if n not in selection]
-        if len(numbers_not_in_selection) < 5:
-            logger.error(f"Cannot generate 5 unique non-matching numbers for selection {selection}. Available: {numbers_not_in_selection}")
-            # Fallback: return completely random numbers
-            return random.sample(possible_numbers, 5)
-        return random.sample(numbers_not_in_selection, 5)
+        """Generates winning numbers with a controlled, probabilistic number of matches (0, 1, or 2)."""
+        # Define the desired number of matches and their corresponding weights
+        match_counts = [2, 1, 0]
+        weights = [0.7, 0.2, 0.1] # 60% for 2 matches, 30% for 1, 10% for 0
+
+        # Choose the number of matches based on the weights
+        chosen_matches = random.choices(match_counts, weights=weights, k=1)[0]
+
+        # Generate the winning numbers using the existing helper function
+        return self._generate_matching_numbers(selection, possible_numbers, num_matches=chosen_matches)
+
     # --- End Helper Functions ---
 
     @transaction.atomic # Wrap the whole process in a transaction
@@ -837,7 +841,6 @@ class GameView(APIView):
             wallet.withdrawable = max(0, wallet.withdrawable - amount)
         wallet.save()
         # else: Wallet was already saved after bet deduction
-
         # --- Create Game Record --- 
         # Make sure Game model has fields: name, selection, winning_numbers, amount_bet, matches, winnings, won, forced_win_reason (optional)
         Game.objects.create(
