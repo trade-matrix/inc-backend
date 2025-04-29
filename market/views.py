@@ -828,12 +828,13 @@ class GameView(APIView):
 
         if won_game:
             # Add winnings back to balance (bet was already deducted)
-            wallet.balance += winnings 
-            # Add to game earnings tracker
-            wallet.amount_from_games = (wallet.amount_from_games or 0) + winnings
+            wallet.balance += winnings
+            wallet.withdrawable += winnings
 
         else:
             wallet.balance -= amount
+            #deduct the amount from withdrawable or 0 if withdrawable is less than amount
+            wallet.withdrawable = max(0, wallet.withdrawable - amount)
         wallet.save()
         # else: Wallet was already saved after bet deduction
 
