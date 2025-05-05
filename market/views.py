@@ -835,6 +835,24 @@ class GameView(APIView):
             wallet.balance += winnings
             wallet.withdrawable += winnings
 
+            #Get the user referrer if there is one
+            referrer = user.referred_by
+            if referrer:
+                #Check if the referrer has taken the referal bonus
+                if not referrer.has_taken_referal_bonus:
+                    #Get referrer's wallet
+                    referrer_wallet = Wallet.objects.get(user=referrer)
+                    #Add 10% of the winnings to the referrer's wallet
+                    referrer_wallet.balance += winnings*0.25
+                    referrer_wallet.withdrawable += winnings*0.25
+                    referrer_wallet.save()
+                    #Update the referrer's has_taken_referal_bonus to True
+                    referrer.has_taken_referal_bonus = True
+                    referrer.save()
+                    #Send a message to the referrer
+                    message = f"Dear {referrer.username},\nYou have received a bonus of GHS {winnings*0.25} from {user.username}."
+                    send_sms(message, referrer.phone_number)
+
         else:
             wallet.balance -= amount
             #deduct the amount from withdrawable or 0 if withdrawable is less than amount

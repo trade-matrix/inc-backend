@@ -17,6 +17,7 @@ class Customer(AbstractUser):
     affiliate = models.BooleanField(default=False)
     has_played_lucky_draw = models.BooleanField(default=False)
     in_depletion_phase = models.BooleanField(default=False)
+    has_taken_referal_bonus = models.BooleanField(default=False)
     vendor = models.ForeignKey('Vendor', on_delete=models.SET_NULL, blank=True, null=True)
 
 class Vendor(models.Model):
