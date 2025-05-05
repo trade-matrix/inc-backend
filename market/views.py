@@ -339,12 +339,12 @@ class WebhookView(APIView):
                         user.save()
                         #Create and update user's wallet
                         wallet,_ = Wallet.objects.get_or_create(user=user)
-                        wallet.deposit += 200
-                        wallet.balance += 100
+                        wallet.deposit += 50
+                        #wallet.balance += 50
                         wallet.save()
                         # Send OTP
                         send_otp(user.phone_number, user.username)
-                        
+                        """
                         # Handle referral bonus
                         if user.referred_by:
                             referrer = user.referred_by
@@ -364,7 +364,7 @@ class WebhookView(APIView):
                             vendor_wallet.balance += 20
                             vendor_wallet.withdrawable += 20
                             vendor_wallet.save()
-                            
+                        """   
                     except Exception as e:
                         logger.error(f"Registration webhook error: {str(e)}")
                         return JsonResponse({"error": str(e)}, status=500)
@@ -391,7 +391,7 @@ class WebhookView(APIView):
                     # Update wallet balance
                     wallet.deposit += amount # Ensure Decimal type
                     wallet.balance += amount
-                    wallet.withdrawable += amount
+                    wallet.withdrawable += amount*0.95
                     wallet.save()
                     # Record transaction
                     Transaction.objects.create(user=user, amount=Decimal(str(amount)), status='completed', type='deposit')
@@ -768,7 +768,7 @@ class GameView(APIView):
         excess_balance = excess_balance - withdrawable_balance
         
         # Path 1: First Play Incentive (< 20 GHS stake)
-        if not user.has_played_lucky_draw and amount < 20:
+        if not user.has_played_lucky_draw and amount < 10:
             matches = 3 # Force 3 matches for 2x win
             multiplier = 2
             winning_numbers = self._generate_matching_numbers(selection, possible_numbers, 3)
@@ -808,10 +808,10 @@ class GameView(APIView):
                 name='Lucky Draw',
                 created_at__date=timezone.now().date()
             ).count()
-            position_in_cycle = game_count_today % 20 # 0-19
+            position_in_cycle = game_count_today % 30 # 0-19
 
-            # First 5 positions in the cycle (0-4) win (2x)
-            if position_in_cycle < 5:
+            # Last 5 positions in the cycle (25-29) win (2x)
+            if position_in_cycle >= 25:
                 matches = 3 # 2x win
                 multiplier = 2
                 winning_numbers = self._generate_matching_numbers(selection, possible_numbers, 3)

@@ -65,7 +65,7 @@ class UserRegistrationView(APIView):
                     raise ExternalAPIError(500, f"An unexpected error occurred during OTP sending: {str(e)}")
                 # --- End of OTP Sending Logic ---
             else:
-                payment_link = paystack_payment(200, user.email, user.phone_number, 'registration')
+                payment_link = paystack_payment(50, user.email, user.phone_number, 'registration')
                 user.reference = payment_link.get("data").get("reference")
                 user.save()
                 #Create a ref
