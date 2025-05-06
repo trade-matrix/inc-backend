@@ -659,238 +659,350 @@ class CommentView(generics.ListCreateAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+import json
+import random
+from decimal import Decimal # Add Decimal for precision
+
+from django.db import transaction
+from django.utils import timezone # Ensure timezone is imported
+from rest_framework import permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from asgiref.sync import async_to_sync # Ensure this is imported
+from channels.layers import get_channel_layer # Ensure this is imported
+
+# Assuming Customer, Wallet, Game models are imported from their respective locations
+from accounts.models import Customer 
+from .models import Wallet, Game 
+# Assuming send_sms is available, e.g., from .utils import send_sms
+from .utils import send_sms 
+import logging # Ensure logger is available
+
+logger = logging.getLogger(__name__)
+
+
+# Game constants (can be defined at class level or globally)
+LUCKY_DRAW_MIN_NUMBER = 1
+LUCKY_DRAW_MAX_NUMBER = 30
+COLOR_PICKER_CHOICES = ['red', 'blue', 'green', 'yellow']
+COIN_TOSS_CHOICES = ['heads', 'tails']
+
 class GameView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [TokenAuthentication, SessionAuthentication]
-    # serializer_class = GameSerializer # Keep removed
+    authentication_classes = [TokenAuthentication, SessionAuthentication] # Assuming these are defined/imported
 
-    # --- Helper functions for generating numbers ---
+    # --- Helper functions for Lucky Draw number generation (existing) ---
     def _generate_matching_numbers(self, selection, possible_numbers, num_matches):
         """Generates winning numbers with a specific number of matches."""
         if num_matches > len(selection) or num_matches > 5 or num_matches < 0:
-            num_matches = 0 # Default to no match if invalid num_matches
+            num_matches = 0 
 
         if num_matches == 0:
+             # For a forced loss (num_matches=0), let non_matching decide probabilistic near-misses
              return self._generate_non_matching_numbers(selection, possible_numbers)
 
         correct_choices = random.sample(selection, num_matches)
         incorrect_choices_needed = 5 - num_matches
         incorrect_choices = []
-
-        # Find numbers available for incorrect choices
         potential_incorrect = [n for n in possible_numbers if n not in correct_choices and n not in selection]
         
         if len(potential_incorrect) >= incorrect_choices_needed:
             incorrect_choices = random.sample(potential_incorrect, incorrect_choices_needed)
         else:
-            # Fallback: If not enough numbers outside selection, pick from any number not in correct_choices
             potential_incorrect_fallback = [n for n in possible_numbers if n not in correct_choices]
             if len(potential_incorrect_fallback) >= incorrect_choices_needed:
                  incorrect_choices = random.sample(potential_incorrect_fallback, incorrect_choices_needed)
             else:
-                 # Extremely unlikely: Can't even find 5 unique numbers total. Log and return random.
-                 logger.error(f"Cannot generate {incorrect_choices_needed} unique incorrect choices.")
-                 return random.sample(possible_numbers, 5)
+                 logger.error(f"Cannot generate {incorrect_choices_needed} unique incorrect choices for lucky draw.")
+                 return random.sample(possible_numbers, 5) # Fallback
 
         winning_numbers = correct_choices + incorrect_choices
         random.shuffle(winning_numbers)
         return winning_numbers
 
     def _generate_non_matching_numbers(self, selection, possible_numbers):
-        """Generates winning numbers with a controlled, probabilistic number of matches (0, 1, or 2)."""
-        # Define the desired number of matches and their corresponding weights
-        match_counts = [2, 1, 0]
-        weights = [0.7, 0.2, 0.1] # 60% for 2 matches, 30% for 1, 10% for 0
+        """Generates winning numbers with a controlled, probabilistic number of matches (0, 1, or 2) for Lucky Draw losses."""
+        match_counts = [2, 1, 0] # For Lucky Draw, a "loss" can still have some matches
+        weights = [0.1, 0.2, 0.7] # Adjusted: 10% for 2, 20% for 1, 70% for 0 (more likely a clear loss)
 
-        # Choose the number of matches based on the weights
         chosen_matches = random.choices(match_counts, weights=weights, k=1)[0]
-
-        # Generate the winning numbers using the existing helper function
         return self._generate_matching_numbers(selection, possible_numbers, num_matches=chosen_matches)
 
-    # --- End Helper Functions ---
-
-    @transaction.atomic # Wrap the whole process in a transaction
-    def post(self, request, *args, **kwargs):
-        user = request.user
-        try:
-            # Use select_for_update to lock the wallet row during the transaction
-            wallet = Wallet.objects.select_for_update().get(user=user)
-        except Wallet.DoesNotExist:
-            return Response({"error": "User wallet not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        selection_data = request.data.get('selection')
-        amount_str = request.data.get('amount')
-
-        # --- Input Validation ---
-        if not amount_str:
-            return Response({"error": "Amount is required"}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            # Use Decimal for monetary values
-            amount = float(amount_str)
-            if amount <= 0:
-                raise ValueError("Amount must be positive")
-        except (ValueError, TypeError):
-            return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
-
+    # --- Game-Specific Validation Helpers ---
+    def _validate_lucky_draw_input(self, request_data):
+        selection_data = request_data.get('selection')
         if not selection_data or not isinstance(selection_data, list):
-            return Response({"error": "Selection must be a list of 5 numbers"}, status=status.HTTP_400_BAD_REQUEST)
+            return None, None, Response({"error": "Selection must be a list of 5 numbers"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             selection = [int(s) for s in selection_data]
             if len(selection) != 5 or len(set(selection)) != 5:
                 raise ValueError("Selection must be 5 unique numbers")
-            # Define valid number range (adjust as needed)
-            MIN_NUMBER = 1
-            MAX_NUMBER = 30
-            if not all(MIN_NUMBER <= num <= MAX_NUMBER for num in selection):
-                raise ValueError(f"Numbers must be between {MIN_NUMBER} and {MAX_NUMBER}")
-            possible_numbers = list(range(MIN_NUMBER, MAX_NUMBER + 1))
+            if not all(LUCKY_DRAW_MIN_NUMBER <= num <= LUCKY_DRAW_MAX_NUMBER for num in selection):
+                raise ValueError(f"Numbers must be between {LUCKY_DRAW_MIN_NUMBER} and {LUCKY_DRAW_MAX_NUMBER}")
+            possible_numbers = list(range(LUCKY_DRAW_MIN_NUMBER, LUCKY_DRAW_MAX_NUMBER + 1))
+            return selection, possible_numbers, None
         except (ValueError, TypeError) as e:
-            return Response({"error": f"Invalid selection: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+            return None, None, Response({"error": f"Invalid selection for Lucky Draw: {e}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # --- Check Balance ---
-        if wallet.balance < amount:
-            return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
+    def _validate_color_picker_input(self, request_data):
+        chosen_color = request_data.get('color')
+        if not chosen_color or chosen_color not in COLOR_PICKER_CHOICES:
+            return None, Response({"error": f"Invalid color. Choose from {', '.join(COLOR_PICKER_CHOICES)}"}, status=status.HTTP_400_BAD_REQUEST)
+        return chosen_color, None
 
-        # --- Deduct Bet Amount & Create Bet Transaction --- 
-        # This happens *before* determining outcome
+    def _validate_coin_toss_input(self, request_data):
+        chosen_side = request_data.get('side')
+        if not chosen_side or chosen_side not in COIN_TOSS_CHOICES:
+            return None, Response({"error": f"Invalid side. Choose from {', '.join(COIN_TOSS_CHOICES)}"}, status=status.HTTP_400_BAD_REQUEST)
+        return chosen_side, None
 
-        # --- Determine Game Logic Path & Outcome --- 
-        user_updated = False
-        force_reason = "Normal Logic"
-        matches = 0
-        multiplier = 0
-        winning_numbers = []
+    # --- Game-Specific Outcome Generation Helpers ---
+    def _generate_lucky_draw_outcome(self, selection, possible_numbers, num_matches_to_force):
+        # num_matches_to_force: if strategy dictates win (e.g., 3 matches), or loss (e.g., 0 for probabilistic loss)
+        winning_numbers = self._generate_matching_numbers(selection, possible_numbers, num_matches_to_force)
+        actual_matches = len(set(selection).intersection(set(winning_numbers)))
+        return actual_matches, winning_numbers
 
-        # Calculate excess balance (handle potential None for withdrawable)
-        withdrawable_balance = wallet.withdrawable or 0
-        excess_balance = wallet.balance # Balance *before* potential winnings, but after deduction
-        excess_balance = excess_balance - withdrawable_balance
+    def _generate_color_picker_outcome(self, chosen_color, force_win):
+        if force_win:
+            winning_color = chosen_color
+        else:
+            # Ensure it's a loss if force_win is False
+            possible_losing_colors = [c for c in COLOR_PICKER_CHOICES if c != chosen_color]
+            if not possible_losing_colors: # Should not happen with >1 color choices
+                winning_color = random.choice(COLOR_PICKER_CHOICES) 
+            else:
+                winning_color = random.choice(possible_losing_colors)
         
-        # Path 1: First Play Incentive (< 20 GHS stake)
-        if not user.has_played_lucky_draw and amount < 10:
-            matches = 3 # Force 3 matches for 2x win
-            multiplier = 2
-            winning_numbers = self._generate_matching_numbers(selection, possible_numbers, 3)
-            user.has_played_lucky_draw = True
-            user.in_depletion_phase = True # Enter depletion phase after first win
-            user_updated = True
-            force_reason = "First Play Win (<20 GHS)"
+        matches = 1 if chosen_color == winning_color else 0
+        return matches, winning_color
 
-        # Path 2: Balance Depletion Phase (if active and excess > 0)
-        elif user.in_depletion_phase and excess_balance > 0:
-            matches = 0 # Force loss
-            multiplier = 0
-            winning_numbers = self._generate_non_matching_numbers(selection, possible_numbers)
-            force_reason = "Depletion Phase Loss"
-            # Check if this loss depletes the remaining excess balance
-            if excess_balance <= 0: # Note: excess_balance already reflects the bet deduction
-                user.in_depletion_phase = False
-                user_updated = True
-                force_reason = "Depletion Phase Ended"
-            # Mark as played if somehow they entered depletion without playing
-            if not user.has_played_lucky_draw:
-                 user.has_played_lucky_draw = True
-                 user_updated = True
+    def _generate_coin_toss_outcome(self, chosen_side, force_win):
+        if force_win:
+            winning_side = chosen_side
+        else:
+            winning_side = random.choice([s for s in COIN_TOSS_CHOICES if s != chosen_side])
+        matches = 1 if chosen_side == winning_side else 0
+        return matches, winning_side
 
+    # --- Core Game Strategy Logic ---
+    def _determine_game_strategy_v2(self, user, wallet, amount_decimal, game_type_request):
+        user_state_updates = {}
+        # game_type_request is like 'lucky_draw', 'color_picker'
+        
+        has_played_attr = f"has_played_{game_type_request}"
+        user_has_played_this_game = getattr(user, has_played_attr, False)
+
+        current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else Decimal('0.0')
+        
+        # This is the non-withdrawable part of the balance *before* the current bet.
+        excess_balance_before_bet = wallet.balance - current_withdrawable
+
+        # Path 1: First Play Incentive
+        if not user_has_played_this_game and amount_decimal < Decimal('10.0'):
+            user_state_updates[f'set_has_played_{game_type_request}'] = True
+            user_state_updates['set_in_depletion_phase'] = True
+            return Decimal('2.0'), f"First Play Win ({game_type_request.replace('_', ' ').title()})", user_state_updates
+
+        # If not first play, ensure has_played is marked true for this game type eventually
+        if not user_has_played_this_game:
+            user_state_updates[f'set_has_played_{game_type_request}'] = True
+        
+        # Path 2: Balance Depletion Phase
+        if user.in_depletion_phase:
+            # Check if losing this bet would consume the *remaining* non-withdrawable funds or more
+            non_withdrawable_after_potential_loss = (wallet.balance - amount_decimal) - current_withdrawable
+            if non_withdrawable_after_potential_loss <= Decimal('0.0'):
+                user_state_updates['set_in_depletion_phase'] = False # End depletion
+                return Decimal('0.0'), f"Depletion Phase Ended by Loss ({game_type_request.replace('_', ' ').title()})", user_state_updates
+            else:
+                # Still in depletion, force loss
+                return Decimal('0.0'), f"Depletion Phase Loss ({game_type_request.replace('_', ' ').title()})", user_state_updates
+        
         # Path 3: Normal Game Cycle Logic
+        # If user *was* in depletion but it's effectively ending because non_withdrawable_after_potential_loss would be <=0 (covered above)
+        # or if excess_balance_before_bet was already too low to sustain a loss in depletion mode.
+        # This case means user is not in a forced win (first play) or forced loss (active depletion for this bet).
+        if user.in_depletion_phase and excess_balance_before_bet <= amount_decimal : # Check if depletion should end
+             user_state_updates['set_in_depletion_phase'] = False
+
+
+        game_name_for_query = self._get_game_name_for_db(game_type_request)
+        game_count_today = Game.objects.filter(
+            name=game_name_for_query,
+            created_at__date=timezone.now().date() # Ensure timezone is imported
+        ).count()
+        position_in_cycle = game_count_today % 30 
+
+        if position_in_cycle >= 25: # Last 5 of 30 win (e.g., positions 25, 26, 27, 28, 29)
+            return Decimal('2.0'), f"Normal Cycle Win (Pos {position_in_cycle}/30, {game_name_for_query})", user_state_updates
         else:
-             # Ensure user is marked as played if they started with stake >= 20 or finished depletion
-            if not user.has_played_lucky_draw:
-                user.has_played_lucky_draw = True
-                user_updated = True
-            if user.in_depletion_phase: # Ensure depletion is turned off if excess balance hit 0
-                 user.in_depletion_phase = False
-                 user_updated = True
-                 
-            # Determine position in the daily 20-game cycle
-            game_count_today = Game.objects.filter(
-                name='Lucky Draw',
-                created_at__date=timezone.now().date()
-            ).count()
-            position_in_cycle = game_count_today % 30 # 0-19
+            return Decimal('0.0'), f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_name_for_query})", user_state_updates
 
-            # Last 5 positions in the cycle (25-29) win (2x)
-            if position_in_cycle >= 25:
-                matches = 3 # 2x win
-                multiplier = 2
-                winning_numbers = self._generate_matching_numbers(selection, possible_numbers, 3)
-                force_reason = f"Normal Cycle Win (Pos {position_in_cycle}/20)"
-            else: # Positions 5-19 lose
-                matches = 0 # Force loss
-                multiplier = 0
-                winning_numbers = self._generate_non_matching_numbers(selection, possible_numbers)
-                force_reason = f"Normal Cycle Loss (Pos {position_in_cycle}/20)"
+    def _get_game_name_for_db(self, game_type_request):
+        mapping = {
+            'lucky_draw': 'Lucky Draw',
+            'color_picker': 'Color Picker',
+            'coin_toss': 'Coin Toss',
+        }
+        return mapping.get(game_type_request, game_type_request.replace('_', ' ').title())
 
-        # Save user state changes if any occurred
-        if user_updated:
-            user.save()
-
-        # --- Calculate Winnings & Update Wallet/Transaction --- 
-        winnings = amount * multiplier
-        won_game = winnings > 0
-
-        if won_game:
-            # Add winnings back to balance (bet was already deducted)
-            wallet.balance += winnings
-            wallet.withdrawable += winnings
-
-            #Get the user referrer if there is one
-            referrer = user.referred_by
-            if referrer:
-                #Check if the referrer has taken the referal bonus
-                if not referrer.has_taken_referal_bonus:
-                    #Get referrer's wallet
-                    referrer_wallet = Wallet.objects.get(user=referrer)
-                    #Add 10% of the winnings to the referrer's wallet
-                    referrer_wallet.balance += winnings*0.25
-                    referrer_wallet.withdrawable += winnings*0.25
-                    referrer_wallet.save()
-                    #Update the referrer's has_taken_referal_bonus to True
-                    referrer.has_taken_referal_bonus = True
-                    referrer.save()
-                    #Send a message to the referrer
-                    message = f"Dear {referrer.username},\nYou have received a bonus of GHS {winnings*0.25} from {user.username}."
-                    send_sms(message, referrer.phone_number)
-
-        else:
-            wallet.balance -= amount
-            #deduct the amount from withdrawable or 0 if withdrawable is less than amount
-            wallet.withdrawable = max(0, wallet.withdrawable - amount)
-        wallet.save()
-        # else: Wallet was already saved after bet deduction
-        # --- Create Game Record --- 
-        # Make sure Game model has fields: name, selection, winning_numbers, amount_bet, matches, winnings, won, forced_win_reason (optional)
-        Game.objects.create(
-            user=request.user,
-            name='Lucky Draw',
-            selection=json.dumps(selection),
-            amount_bet=amount,
-            matches=matches,
-            winnings=winnings,
-            won=won_game,
-            # forced_win_reason=force_reason # Optional: Add this field to Game model if needed for tracking
+    def send_balance_update(self, wallet):
+        """Send the balance update via WebSocket."""
+        channel_layer = get_channel_layer() # Ensure get_channel_layer is imported
+        balance_data = {
+            "new_balance": float(wallet.balance), # Convert Decimal to float for JSON
+            "earnings": float(wallet.balance - (wallet.deposit if wallet.deposit is not None else Decimal('0.0')))
+        }
+        async_to_sync(channel_layer.group_send)( # Ensure async_to_sync is imported
+            f"user_{wallet.user.id}",
+            {
+                "type": "send_balance_update",
+                "new_balance": balance_data,
+            }
         )
 
-        # --- Send Final Balance Update via WebSocket --- 
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        try:
+            wallet = Wallet.objects.select_for_update().get(user=user)
+        except Wallet.DoesNotExist:
+            return Response({"error": "User wallet not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        game_type_request = request.data.get('game_type') # e.g., 'lucky_draw', 'color_picker', 'coin_toss'
+        amount_str = request.data.get('amount')
+
+        if not game_type_request:
+            return Response({"error": "game_type is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not amount_str:
+            return Response({"error": "Amount is required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # --- Construct Response --- 
-        message = f"Matched {matches} numbers."
-        if won_game:
-            message += f" You won GHS {winnings:.2f}! ({force_reason})"
+        try:
+            amount_decimal = float(amount_str)
+            if amount_decimal <= 0:
+                raise ValueError("Amount must be positive")
+        except (ValueError, TypeError):
+            return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if wallet.balance < amount_decimal:
+            return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # --- Determine Game Strategy (Win/Loss/Multiplier based on user state & cycle) ---
+        effective_multiplier, force_reason, user_state_updates = self._determine_game_strategy_v2(user, wallet, amount_decimal, game_type_request)
+
+        # --- Game-Specific Validation and Outcome Generation ---
+        actual_matches = 0 # Raw game matches, before strategy override
+        winning_outcome_details = None 
+        user_game_input = None
+        game_name_db = self._get_game_name_for_db(game_type_request)
+        error_response = None
+
+        if game_type_request == 'lucky_draw':
+            user_game_input, possible_numbers, error_response = self._validate_lucky_draw_input(request.data)
+            if not error_response:
+                num_matches_to_force_lucky_draw = 3 if effective_multiplier > Decimal('0') else 0 # 3 for win, 0 for probabilistic loss
+                actual_matches, winning_outcome_details = self._generate_lucky_draw_outcome(user_game_input, possible_numbers, num_matches_to_force_lucky_draw)
+        elif game_type_request == 'color_picker':
+            user_game_input, error_response = self._validate_color_picker_input(request.data)
+            if not error_response:
+                actual_matches, winning_outcome_details = self._generate_color_picker_outcome(user_game_input, force_win=(effective_multiplier > Decimal('0')))
+        elif game_type_request == 'coin_toss':
+            user_game_input, error_response = self._validate_coin_toss_input(request.data)
+            if not error_response:
+                actual_matches, winning_outcome_details = self._generate_coin_toss_outcome(user_game_input, force_win=(effective_multiplier > Decimal('0')))
         else:
-            message += f" Better luck next time! ({force_reason})"
+            return Response({"error": "Invalid game_type"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if error_response:
+            return error_response
+
+        # --- Apply User State Changes (determined by strategy) ---
+        user_changed_by_strategy = False
+        for key, value in user_state_updates.items():
+            if key.startswith('set_has_played_'):
+                attr_name = key.replace('set_has_played_', 'has_played_')
+                setattr(user, attr_name, value)
+                user_changed_by_strategy = True
+            elif key == 'set_in_depletion_phase':
+                user.in_depletion_phase = value
+                user_changed_by_strategy = True
+        
+        if user_changed_by_strategy:
+            user.save()
+        
+        # --- Calculate Winnings & Update Wallet ---
+        wallet.balance -= amount_decimal # Deduct bet amount first
+
+        winnings = amount_decimal * effective_multiplier
+        won_game = winnings > Decimal('0')
+
+        if won_game:
+            wallet.balance += winnings 
+            wallet.withdrawable += winnings
+
+            # Referrer bonus (now game-specific)
+            referrer = user.referred_by
+            referral_bonus_attr = f"has_taken_{game_type_request}_referral_bonus"
+            if referrer and not getattr(referrer, referral_bonus_attr, False):
+                try:
+                    referrer_wallet = Wallet.objects.get(user=referrer)
+                    bonus_amount = winnings * Decimal('0.25') # 25% bonus
+                    referrer_wallet.balance += bonus_amount
+                    referrer_wallet.withdrawable += bonus_amount
+                    referrer_wallet.save()
+                    
+                    setattr(referrer, referral_bonus_attr, True)
+                    referrer.save()
+                    
+                    sms_message = f"Dear {referrer.username},\nYou have received a bonus of GHS {bonus_amount:.2f} from {user.username}'s {game_name_db} game."
+                    send_sms(sms_message, referrer.phone_number)
+                    #Explain to user why their winnings reduced
+                    sms_message = f"Dear {user.username},\nYour winnings have been reduced by GHS {bonus_amount:.2f} due to a referral bonus from {referrer.username}. Referral bonus is 25% of your winnings. Refer more users to earn more."
+                    send_sms(sms_message, user.phone_number)
+                except Wallet.DoesNotExist:
+                    logger.error(f"Referrer wallet not found for user {referrer.id} during {game_name_db} bonus.")
+                except Exception as e:
+                    logger.error(f"Error processing referrer bonus for {game_name_db}: {e}")
+        else: # Lost game
+            current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else Decimal('0.0')
+            wallet.withdrawable = max(Decimal('0.0'), current_withdrawable - amount_decimal)
+
+        wallet.save()
+
+        # --- Create Game Record ---
+        Game.objects.create(
+            user=user,
+            name=game_name_db,
+            selection=json.dumps(user_game_input), 
+            winning_numbers=json.dumps(winning_outcome_details), # Stores actual winning outcome details
+            amount_bet=amount_decimal,
+            matches=actual_matches, # Raw game matches
+            winnings=winnings,    # Actual winnings after strategy
+            won=won_game,
+            forced_reason=force_reason 
+        )
+
+        # --- Send Final Balance Update via WebSocket ---
+        self.send_balance_update(wallet)
+        
+        # --- Construct Response ---
+        response_message_detail = force_reason
+        if won_game:
+            response_message = f"You won GHS {winnings:.2f}! ({response_message_detail})"
+        else:
+            response_message = f"Better luck next time. ({response_message_detail})"
             
         response_data = {
-            "message": message,
-            "user_selection": selection,
-            "winning_numbers": winning_numbers,
-            "matches": matches,
-            "amount_bet": float(amount),
+            "message": response_message,
+            "game_type": game_type_request,
+            "user_input": user_game_input,
+            "winning_outcome": winning_outcome_details,
+            "raw_matches": actual_matches, 
+            "amount_bet": float(amount_decimal),
             "winnings": float(winnings),
             "new_balance": float(wallet.balance),
             "won": won_game,
-            #"game_logic_reason": force_reason # Added for clarity
         }
         return Response(response_data, status=status.HTTP_200_OK)
 

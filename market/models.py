@@ -1,5 +1,6 @@
 from django.db import models
 from accounts.models import Customer
+from django.db.models import DecimalField
 # Create your models here.
 class Investment(models.Model):
     user = models.ManyToManyField(Customer, related_name='investors', blank=True)
@@ -78,7 +79,7 @@ class Comment(models.Model):
 
 class Requested_Withdraw(models.Model):
     user = models.ForeignKey(Customer, on_delete=models.CASCADE)
-    amount = models.FloatField()
+    amount = DecimalField(max_digits=10, decimal_places=2)
     phone_number = models.CharField(max_length=255)
     operator = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -94,6 +95,7 @@ class Game(models.Model):
     name = models.CharField(max_length=255, default='Lucky Draw')
     user = models.ForeignKey(Customer, related_name='players', blank=True, on_delete=models.CASCADE)
     selection = models.CharField(max_length=255, blank=True, null=True)
+    winning_numbers = models.CharField(max_length=255, blank=True, null=True)
     active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     won = models.BooleanField(default=False)
@@ -101,6 +103,7 @@ class Game(models.Model):
     winnings = models.FloatField(default=0.00)
     matches = models.IntegerField(default=0)
     today = models.BooleanField(default=False)
+    forced_reason = models.CharField(max_length=255, null=True, blank=True)
     def __str__(self):
         return self.name
 
@@ -114,11 +117,11 @@ class Profit(models.Model):
 class PoolParticipant(models.Model):
     pool = models.ForeignKey('Pool', on_delete=models.CASCADE)
     user = models.ForeignKey('accounts.Customer', on_delete=models.CASCADE)
-    deposit_amount = models.FloatField(default=0.00)
+    deposit_amount = DecimalField(max_digits=10, decimal_places=2, default=0.00)
     joined_at = models.DateTimeField(auto_now_add=True)
 
 class Pool(models.Model):
-    deposits = models.FloatField(default=0.00)
+    deposits = DecimalField(max_digits=10, decimal_places=2, default=0.00)
     name = models.CharField(max_length=255, default='Pool')
     participants = models.ManyToManyField('accounts.Customer', through='PoolParticipant')
 
