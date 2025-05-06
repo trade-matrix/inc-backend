@@ -955,15 +955,16 @@ class GameView(APIView):
         # --- Construct Response ---
         response_message_detail = force_reason
         if won_game:
-            response_message = f"You won GHS {winnings:.2f}! ({response_message_detail})"
+            response_message = f"You won GHS {winnings:.2f}!"
         else:
-            response_message = f"Better luck next time. ({response_message_detail})"
+            response_message = f"Better luck next time."
             
         response_data = {
             "message": response_message,
             "game_type": game_type_request,
             "user_input": user_game_input,
             "raw_matches": actual_matches, 
+            "winning_outcome": winning_outcome_details,
             "amount_bet": float(amount_decimal),
             "winnings": float(winnings),
             "new_balance": float(wallet.balance),
