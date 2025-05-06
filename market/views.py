@@ -5,11 +5,11 @@ from .models import Investment, Pool, PoolParticipant
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Wallet, Operator, Transaction, Comment, Requested_Withdraw, Game
-from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerializer, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer, CommentSerializer, GameSerializer
+from .serializers import InvestmentSerializer, RequesttoInvest, PredictionSerializer, Withdraw, CheckMomoSerializer, TransactionSerializer, WalletSerializer, CommentSerializer
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from accounts.models import Customer, Ref
-from .utils import send_sms, check_momo, status_check, handle_payment, withdraw,paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check,update_user, add_to_pool, add_to_deposit, distribute_pool_earnings
+from .utils import send_sms, check_momo, status_check, withdraw, paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check, update_user, distribute_pool_earnings
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from accounts.utils import send_otp
@@ -23,13 +23,19 @@ from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 import logging
 import random
-from decimal import Decimal
 from django.db.models import F # Not used currently, but keep for potential atomic updates
 from django.db import transaction # Import transaction
+from decimal import Decimal  # Add this import for Decimal type
 
-MULTIPLIER_A = 2.0
-MULTIPLIER_B = 1.5
-MULTIPLIER_C = 1.0
+# Game constants (can be defined at class level or globally)
+LUCKY_DRAW_MIN_NUMBER = 1
+LUCKY_DRAW_MAX_NUMBER = 30
+COLOR_PICKER_CHOICES = ['red', 'blue', 'green']
+COIN_TOSS_CHOICES = ['heads', 'tails']
+# Pool multiplier constants
+MULTIPLIER_A = 3.0  # Add this constant for pool distribution
+MULTIPLIER_B = 2.0  # Add this constant for pool distribution
+MULTIPLIER_C = 1.0  # Add this constant for pool distribution
 
 logger = logging.getLogger(__name__)
 
@@ -340,7 +346,7 @@ class WebhookView(APIView):
                         #Create and update user's wallet
                         wallet,_ = Wallet.objects.get_or_create(user=user)
                         wallet.deposit += 50
-                        #wallet.balance += 50
+                        wallet.balance += 50
                         wallet.save()
                         # Send OTP
                         send_otp(user.phone_number, user.username)
@@ -659,34 +665,6 @@ class CommentView(generics.ListCreateAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-import json
-import random
-from decimal import Decimal # Add Decimal for precision
-
-from django.db import transaction
-from django.utils import timezone # Ensure timezone is imported
-from rest_framework import permissions, status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from asgiref.sync import async_to_sync # Ensure this is imported
-from channels.layers import get_channel_layer # Ensure this is imported
-
-# Assuming Customer, Wallet, Game models are imported from their respective locations
-from accounts.models import Customer 
-from .models import Wallet, Game 
-# Assuming send_sms is available, e.g., from .utils import send_sms
-from .utils import send_sms 
-import logging # Ensure logger is available
-
-logger = logging.getLogger(__name__)
-
-
-# Game constants (can be defined at class level or globally)
-LUCKY_DRAW_MIN_NUMBER = 1
-LUCKY_DRAW_MAX_NUMBER = 30
-COLOR_PICKER_CHOICES = ['red', 'blue', 'green']
-COIN_TOSS_CHOICES = ['heads', 'tails']
-
 class GameView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [TokenAuthentication, SessionAuthentication] # Assuming these are defined/imported
@@ -985,7 +963,6 @@ class GameView(APIView):
             "message": response_message,
             "game_type": game_type_request,
             "user_input": user_game_input,
-            "winning_outcome": winning_outcome_details,
             "raw_matches": actual_matches, 
             "amount_bet": float(amount_decimal),
             "winnings": float(winnings),
