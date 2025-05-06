@@ -684,7 +684,7 @@ logger = logging.getLogger(__name__)
 # Game constants (can be defined at class level or globally)
 LUCKY_DRAW_MIN_NUMBER = 1
 LUCKY_DRAW_MAX_NUMBER = 30
-COLOR_PICKER_CHOICES = ['red', 'blue', 'green', 'yellow']
+COLOR_PICKER_CHOICES = ['red', 'blue', 'green']
 COIN_TOSS_CHOICES = ['heads', 'tails']
 
 class GameView(APIView):
@@ -793,16 +793,16 @@ class GameView(APIView):
         has_played_attr = f"has_played_{game_type_request}"
         user_has_played_this_game = getattr(user, has_played_attr, False)
 
-        current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else Decimal('0.0')
+        current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else 0.0
         
         # This is the non-withdrawable part of the balance *before* the current bet.
         excess_balance_before_bet = wallet.balance - current_withdrawable
 
         # Path 1: First Play Incentive
-        if not user_has_played_this_game and amount_decimal < Decimal('10.0'):
+        if not user_has_played_this_game and amount_decimal <= 10.0:
             user_state_updates[f'set_has_played_{game_type_request}'] = True
             user_state_updates['set_in_depletion_phase'] = True
-            return Decimal('2.0'), f"First Play Win ({game_type_request.replace('_', ' ').title()})", user_state_updates
+            return 2.0, f"First Play Win ({game_type_request.replace('_', ' ').title()})", user_state_updates
 
         # If not first play, ensure has_played is marked true for this game type eventually
         if not user_has_played_this_game:
@@ -812,12 +812,12 @@ class GameView(APIView):
         if user.in_depletion_phase:
             # Check if losing this bet would consume the *remaining* non-withdrawable funds or more
             non_withdrawable_after_potential_loss = (wallet.balance - amount_decimal) - current_withdrawable
-            if non_withdrawable_after_potential_loss <= Decimal('0.0'):
+            if non_withdrawable_after_potential_loss <= 0:
                 user_state_updates['set_in_depletion_phase'] = False # End depletion
-                return Decimal('0.0'), f"Depletion Phase Ended by Loss ({game_type_request.replace('_', ' ').title()})", user_state_updates
+                return 0.0, f"Depletion Phase Ended by Loss ({game_type_request.replace('_', ' ').title()})", user_state_updates
             else:
                 # Still in depletion, force loss
-                return Decimal('0.0'), f"Depletion Phase Loss ({game_type_request.replace('_', ' ').title()})", user_state_updates
+                return 0.0, f"Depletion Phase Loss ({game_type_request.replace('_', ' ').title()})", user_state_updates
         
         # Path 3: Normal Game Cycle Logic
         # If user *was* in depletion but it's effectively ending because non_withdrawable_after_potential_loss would be <=0 (covered above)
@@ -835,9 +835,9 @@ class GameView(APIView):
         position_in_cycle = game_count_today % 30 
 
         if position_in_cycle >= 25: # Last 5 of 30 win (e.g., positions 25, 26, 27, 28, 29)
-            return Decimal('2.0'), f"Normal Cycle Win (Pos {position_in_cycle}/30, {game_name_for_query})", user_state_updates
+            return 2.0, f"Normal Cycle Win (Pos {position_in_cycle}/30, {game_name_for_query})", user_state_updates
         else:
-            return Decimal('0.0'), f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_name_for_query})", user_state_updates
+            return 0.0, f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_name_for_query})", user_state_updates
 
     def _get_game_name_for_db(self, game_type_request):
         mapping = {
@@ -935,7 +935,7 @@ class GameView(APIView):
         wallet.balance -= amount_decimal # Deduct bet amount first
 
         winnings = amount_decimal * effective_multiplier
-        won_game = winnings > Decimal('0')
+        won_game = winnings > 0
 
         if won_game:
             wallet.balance += winnings 
