@@ -898,7 +898,7 @@ class GameView(APIView):
             user.save()
         
         # --- Calculate Winnings & Update Wallet ---
-        wallet.balance -= amount_decimal # Deduct bet amount first
+       
 
         winnings = amount_decimal * effective_multiplier
         won_game = winnings > 0
@@ -920,7 +920,7 @@ class GameView(APIView):
                     
                     referrer.has_taken_referral_bonus = True
                     referrer.save()
-                    
+                    Transaction.objects.create(user=referrer, amount=bonus_amount, status='completed', type='referal', reffered=user.username)
                     sms_message = f"Dear {referrer.username},\nYou have received a bonus of GHS {bonus_amount:.2f} from {user.username}'s {game_name_db} game."
                     send_sms(sms_message, referrer.phone_number)
                     #Explain to user why their winnings reduced
@@ -931,6 +931,7 @@ class GameView(APIView):
                 except Exception as e:
                     logger.error(f"Error processing referrer bonus for {game_name_db}: {e}")
         else: # Lost game
+            wallet.balance -= amount_decimal # Deduct bet amount first
             current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else 0.0
             wallet.withdrawable = max(0.0, current_withdrawable - amount_decimal)
 
