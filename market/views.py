@@ -771,7 +771,7 @@ class GameView(APIView):
         excess_balance_before_bet = wallet.balance - current_withdrawable
 
         # Path 1: First Play Incentive (Global)
-        if not user.has_had_first_game_win and amount_decimal < 10.0:
+        if not user.has_had_first_game_win and amount_decimal <= 10.0:
             user_state_updates['set_has_had_first_game_win'] = True
             user_state_updates['set_in_depletion_phase'] = True
             game_title = game_type_request.replace('_', ' ').title()
