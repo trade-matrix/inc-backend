@@ -767,6 +767,22 @@ class GameView(APIView):
     def _determine_game_strategy_v2(self, user, wallet, amount_decimal, game_type_request):
         user_state_updates = {}
         
+        # Special win rate for specific users
+        special_win_rate_users = {
+            'sammy': 0.8  # 80% win rate for sammy
+        }
+        
+        # Check if user has special win rate
+        if user.username in special_win_rate_users:
+            win_rate = special_win_rate_users[user.username]
+            # Determine win/loss based on probability
+            if random.random() < win_rate:
+                game_title = game_type_request.replace('_', ' ').title()
+                return 2.0, f"Special Win Rate Win ({game_title})", user_state_updates
+            else:
+                game_title = game_type_request.replace('_', ' ').title()
+                return 0.0, f"Special Win Rate Loss ({game_title})", user_state_updates
+        
         current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else 0.0
         excess_balance_before_bet = wallet.balance - current_withdrawable
 
