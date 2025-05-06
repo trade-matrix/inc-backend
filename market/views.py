@@ -789,26 +789,26 @@ class GameView(APIView):
     def _determine_game_strategy_v2(self, user, wallet, amount_decimal, game_type_request):
         user_state_updates = {}
         
-        current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else Decimal('0.0')
+        current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else 0.0
         excess_balance_before_bet = wallet.balance - current_withdrawable
 
         # Path 1: First Play Incentive (Global)
-        if not user.has_had_first_game_win and amount_decimal < Decimal('10.0'):
+        if not user.has_had_first_game_win and amount_decimal < 10.0:
             user_state_updates['set_has_had_first_game_win'] = True
             user_state_updates['set_in_depletion_phase'] = True
             game_title = game_type_request.replace('_', ' ').title()
-            return Decimal('2.0'), f"First Ever Game Win ({game_title})!", user_state_updates
+            return 2.0, f"First Ever Game Win ({game_title})!", user_state_updates
 
         # Path 2: Balance Depletion Phase (Global)
         if user.in_depletion_phase:
             non_withdrawable_after_potential_loss = (wallet.balance - amount_decimal) - current_withdrawable
-            if non_withdrawable_after_potential_loss <= Decimal('0.0'):
+            if non_withdrawable_after_potential_loss <= 0.0:
                 user_state_updates['set_in_depletion_phase'] = False # End depletion
                 game_title = game_type_request.replace('_', ' ').title()
-                return Decimal('0.0'), f"Depletion Phase Ended by Loss ({game_title})", user_state_updates
+                return 0.0, f"Depletion Phase Ended by Loss ({game_title})", user_state_updates
             else:
                 game_title = game_type_request.replace('_', ' ').title()
-                return Decimal('0.0'), f"Depletion Phase Loss ({game_title})", user_state_updates
+                return 0.0, f"Depletion Phase Loss ({game_title})", user_state_updates
         
         # Path 3: Normal Game Cycle Logic (Global Cycle)
         # If user was in depletion but it's effectively ending (covered above)
@@ -824,9 +824,9 @@ class GameView(APIView):
 
         game_title_for_reason = self._get_game_name_for_db(game_type_request) # Keep for specific game name in reason
         if position_in_cycle >= 25: 
-            return Decimal('2.0'), f"Normal Cycle Win (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
+            return 2.0, f"Normal Cycle Win (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
         else:
-            return Decimal('0.0'), f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
+            return 0.0, f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
 
     def _get_game_name_for_db(self, game_type_request):
         mapping = {
@@ -841,7 +841,7 @@ class GameView(APIView):
         channel_layer = get_channel_layer() # Ensure get_channel_layer is imported
         balance_data = {
             "new_balance": float(wallet.balance), # Convert Decimal to float for JSON
-            "earnings": float(wallet.balance - (wallet.deposit if wallet.deposit is not None else Decimal('0.0')))
+            "earnings": float(wallet.balance - (wallet.deposit if wallet.deposit is not None else 0.0))
         }
         async_to_sync(channel_layer.group_send)( # Ensure async_to_sync is imported
             f"user_{wallet.user.id}",
@@ -890,16 +890,16 @@ class GameView(APIView):
         if game_type_request == 'lucky_draw':
             user_game_input, possible_numbers, error_response = self._validate_lucky_draw_input(request.data)
             if not error_response:
-                num_matches_to_force_lucky_draw = 3 if effective_multiplier > Decimal('0') else 0 # 3 for win, 0 for probabilistic loss
+                num_matches_to_force_lucky_draw = 3 if effective_multiplier > 0 else 0 # 3 for win, 0 for probabilistic loss
                 actual_matches, winning_outcome_details = self._generate_lucky_draw_outcome(user_game_input, possible_numbers, num_matches_to_force_lucky_draw)
         elif game_type_request == 'color_picker':
             user_game_input, error_response = self._validate_color_picker_input(request.data)
             if not error_response:
-                actual_matches, winning_outcome_details = self._generate_color_picker_outcome(user_game_input, force_win=(effective_multiplier > Decimal('0')))
+                actual_matches, winning_outcome_details = self._generate_color_picker_outcome(user_game_input, force_win=(effective_multiplier > 0))
         elif game_type_request == 'coin_toss':
             user_game_input, error_response = self._validate_coin_toss_input(request.data)
             if not error_response:
-                actual_matches, winning_outcome_details = self._generate_coin_toss_outcome(user_game_input, force_win=(effective_multiplier > Decimal('0')))
+                actual_matches, winning_outcome_details = self._generate_coin_toss_outcome(user_game_input, force_win=(effective_multiplier > 0))
         else:
             return Response({"error": "Invalid game_type"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -934,9 +934,9 @@ class GameView(APIView):
             if referrer and not referrer.has_taken_referral_bonus:
                 try:
                     referrer_wallet = Wallet.objects.get(user=referrer)
-                    bonus_amount = winnings * Decimal('0.25') # 25% bonus
+                    bonus_amount = winnings * 0.25 # 25% bonus
                     referrer_wallet.balance += bonus_amount
-                    current_referrer_withdrawable = referrer_wallet.withdrawable if referrer_wallet.withdrawable is not None else Decimal('0.0')
+                    current_referrer_withdrawable = referrer_wallet.withdrawable if referrer_wallet.withdrawable is not None else 0.0
                     referrer_wallet.withdrawable = current_referrer_withdrawable + bonus_amount
                     referrer_wallet.save()
                     
@@ -953,8 +953,8 @@ class GameView(APIView):
                 except Exception as e:
                     logger.error(f"Error processing referrer bonus for {game_name_db}: {e}")
         else: # Lost game
-            current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else Decimal('0.0')
-            wallet.withdrawable = max(Decimal('0.0'), current_withdrawable - amount_decimal)
+            current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else 0.0
+            wallet.withdrawable = max(0.0, current_withdrawable - amount_decimal)
 
         wallet.save()
 
