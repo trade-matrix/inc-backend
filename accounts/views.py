@@ -173,7 +173,7 @@ class UserLoginView(generics.CreateAPIView):
                 "user_paid": user.paid
             }
         else:
-            payment_link = paystack_payment(200, user.email, user.phone_number, 'registration')
+            payment_link = paystack_payment(50, user.email, user.phone_number, 'registration')
             user.reference = payment_link.get("data").get("reference")
             user.save()
             #Create a ref
@@ -203,6 +203,8 @@ class UserResendOTP(generics.CreateAPIView):
         phone = Customer.objects.get(pk=serializer.validated_data.get('user_id')).phone_number
         user_id = serializer.validated_data.get('user_id')
         user = Customer.objects.get(pk=user_id)
+        if not user.paid:
+            return Response({"message": "Payment required"}, status=400)
         message = f"Hello {user.username}, Welcome to Trade-Matrix."
         data = {
         'expiry': 5,
