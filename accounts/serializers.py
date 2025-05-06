@@ -78,6 +78,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                     if referal_user.paid:
                         user.referred_by = referal_user
                         user.save()
+                        Transaction.objects.create(user=referal_user, amount=25.00, status='completed', type='referal', reffered=user.username)
                     else:
                         user.referred_by = None
                         user.save()

@@ -920,7 +920,7 @@ class GameView(APIView):
                     
                     referrer.has_taken_referral_bonus = True
                     referrer.save()
-                    Transaction.objects.create(user=referrer, amount=bonus_amount, status='completed', type='referal', reffered=user.username)
+                    
                     sms_message = f"Dear {referrer.username},\nYou have received a bonus of GHS {bonus_amount:.2f} from {user.username}'s {game_name_db} game."
                     send_sms(sms_message, referrer.phone_number)
                     #Explain to user why their winnings reduced
