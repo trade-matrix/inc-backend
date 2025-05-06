@@ -779,8 +779,8 @@ class GameView(APIView):
 
         # Path 2: Balance Depletion Phase (Global)
         if user.in_depletion_phase:
-            non_withdrawable_after_potential_loss = (wallet.balance - amount_decimal) - current_withdrawable
-            if non_withdrawable_after_potential_loss <= 0.0:
+            non_withdrawable_after_potential_loss = wallet.game_track
+            if non_withdrawable_after_potential_loss >= 50.0:
                 user_state_updates['set_in_depletion_phase'] = False # End depletion
                 game_title = game_type_request.replace('_', ' ').title()
                 return 0.0, f"Depletion Phase Ended by Loss ({game_title})", user_state_updates
@@ -906,7 +906,7 @@ class GameView(APIView):
         if won_game:
             wallet.balance += winnings 
             wallet.withdrawable += winnings
-
+            
             # Referrer bonus (now game-specific)
             referrer = user.referred_by
             if referrer and not referrer.has_taken_referral_bonus:
@@ -932,6 +932,7 @@ class GameView(APIView):
                     logger.error(f"Error processing referrer bonus for {game_name_db}: {e}")
         else: # Lost game
             wallet.balance -= amount_decimal # Deduct bet amount first
+            wallet.game_track += amount_decimal
             current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else 0.0
             wallet.withdrawable = max(0.0, current_withdrawable - amount_decimal)
 
