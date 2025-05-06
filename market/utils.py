@@ -142,13 +142,12 @@ def update_user(email,sub, context, template):
     msg.send()
 
 def check_momo(phone_number, operator):
-    url = 'https://api.korapay.com/merchant/api/v1/misc/mobile-money/resolve'
-    data = {
-        "phoneNumber": phone_number,
-        "mobileMoneyCode": operator,
-        "currency": "GHS"
-    }
-    response = requests.post(url, json=data)
+    url = f'https://api.paystack.co/bank/resolve?account_number={phone_number}&bank_code={operator}'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {pay_stack_secret}'
+    }   
+    response = requests.get(url, headers=headers)
     if response.status_code == 200:
         return response.json()
     else:
