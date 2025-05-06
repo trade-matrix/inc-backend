@@ -788,56 +788,45 @@ class GameView(APIView):
     # --- Core Game Strategy Logic ---
     def _determine_game_strategy_v2(self, user, wallet, amount_decimal, game_type_request):
         user_state_updates = {}
-        # game_type_request is like 'lucky_draw', 'color_picker'
         
-        has_played_attr = f"has_played_{game_type_request}"
-        user_has_played_this_game = getattr(user, has_played_attr, False)
-
-        current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else 0.0
-        
-        # This is the non-withdrawable part of the balance *before* the current bet.
+        current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else Decimal('0.0')
         excess_balance_before_bet = wallet.balance - current_withdrawable
 
-        # Path 1: First Play Incentive
-        if not user_has_played_this_game and amount_decimal <= 10.0:
-            user_state_updates[f'set_has_played_{game_type_request}'] = True
+        # Path 1: First Play Incentive (Global)
+        if not user.has_had_first_game_win and amount_decimal < Decimal('10.0'):
+            user_state_updates['set_has_had_first_game_win'] = True
             user_state_updates['set_in_depletion_phase'] = True
-            return 2.0, f"First Play Win ({game_type_request.replace('_', ' ').title()})", user_state_updates
+            game_title = game_type_request.replace('_', ' ').title()
+            return Decimal('2.0'), f"First Ever Game Win ({game_title})!", user_state_updates
 
-        # If not first play, ensure has_played is marked true for this game type eventually
-        if not user_has_played_this_game:
-            user_state_updates[f'set_has_played_{game_type_request}'] = True
-        
-        # Path 2: Balance Depletion Phase
+        # Path 2: Balance Depletion Phase (Global)
         if user.in_depletion_phase:
-            # Check if losing this bet would consume the *remaining* non-withdrawable funds or more
             non_withdrawable_after_potential_loss = (wallet.balance - amount_decimal) - current_withdrawable
-            if non_withdrawable_after_potential_loss <= 0:
+            if non_withdrawable_after_potential_loss <= Decimal('0.0'):
                 user_state_updates['set_in_depletion_phase'] = False # End depletion
-                return 0.0, f"Depletion Phase Ended by Loss ({game_type_request.replace('_', ' ').title()})", user_state_updates
+                game_title = game_type_request.replace('_', ' ').title()
+                return Decimal('0.0'), f"Depletion Phase Ended by Loss ({game_title})", user_state_updates
             else:
-                # Still in depletion, force loss
-                return 0.0, f"Depletion Phase Loss ({game_type_request.replace('_', ' ').title()})", user_state_updates
+                game_title = game_type_request.replace('_', ' ').title()
+                return Decimal('0.0'), f"Depletion Phase Loss ({game_title})", user_state_updates
         
-        # Path 3: Normal Game Cycle Logic
-        # If user *was* in depletion but it's effectively ending because non_withdrawable_after_potential_loss would be <=0 (covered above)
+        # Path 3: Normal Game Cycle Logic (Global Cycle)
+        # If user was in depletion but it's effectively ending (covered above)
         # or if excess_balance_before_bet was already too low to sustain a loss in depletion mode.
-        # This case means user is not in a forced win (first play) or forced loss (active depletion for this bet).
-        if user.in_depletion_phase and excess_balance_before_bet <= amount_decimal : # Check if depletion should end
+        if user.in_depletion_phase and excess_balance_before_bet <= amount_decimal : 
              user_state_updates['set_in_depletion_phase'] = False
 
-
-        game_name_for_query = self._get_game_name_for_db(game_type_request)
+        # Count ALL games played today for the global cycle
         game_count_today = Game.objects.filter(
-            name=game_name_for_query,
-            created_at__date=timezone.now().date() # Ensure timezone is imported
+            created_at__date=timezone.now().date() 
         ).count()
         position_in_cycle = game_count_today % 30 
 
-        if position_in_cycle >= 25: # Last 5 of 30 win (e.g., positions 25, 26, 27, 28, 29)
-            return 2.0, f"Normal Cycle Win (Pos {position_in_cycle}/30, {game_name_for_query})", user_state_updates
+        game_title_for_reason = self._get_game_name_for_db(game_type_request) # Keep for specific game name in reason
+        if position_in_cycle >= 25: 
+            return Decimal('2.0'), f"Normal Cycle Win (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
         else:
-            return 0.0, f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_name_for_query})", user_state_updates
+            return Decimal('0.0'), f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
 
     def _get_game_name_for_db(self, game_type_request):
         mapping = {
@@ -920,9 +909,8 @@ class GameView(APIView):
         # --- Apply User State Changes (determined by strategy) ---
         user_changed_by_strategy = False
         for key, value in user_state_updates.items():
-            if key.startswith('set_has_played_'):
-                attr_name = key.replace('set_has_played_', 'has_played_')
-                setattr(user, attr_name, value)
+            if key == 'set_has_had_first_game_win':
+                user.has_had_first_game_win = value
                 user_changed_by_strategy = True
             elif key == 'set_in_depletion_phase':
                 user.in_depletion_phase = value
@@ -943,16 +931,16 @@ class GameView(APIView):
 
             # Referrer bonus (now game-specific)
             referrer = user.referred_by
-            referral_bonus_attr = f"has_taken_{game_type_request}_referral_bonus"
-            if referrer and not getattr(referrer, referral_bonus_attr, False):
+            if referrer and not referrer.has_taken_referral_bonus:
                 try:
                     referrer_wallet = Wallet.objects.get(user=referrer)
                     bonus_amount = winnings * Decimal('0.25') # 25% bonus
                     referrer_wallet.balance += bonus_amount
-                    referrer_wallet.withdrawable += bonus_amount
+                    current_referrer_withdrawable = referrer_wallet.withdrawable if referrer_wallet.withdrawable is not None else Decimal('0.0')
+                    referrer_wallet.withdrawable = current_referrer_withdrawable + bonus_amount
                     referrer_wallet.save()
                     
-                    setattr(referrer, referral_bonus_attr, True)
+                    referrer.has_taken_referral_bonus = True
                     referrer.save()
                     
                     sms_message = f"Dear {referrer.username},\nYou have received a bonus of GHS {bonus_amount:.2f} from {user.username}'s {game_name_db} game."
