@@ -349,7 +349,7 @@ class WebhookView(APIView):
                         wallet.balance += 50
                         wallet.save()
                         # Send OTP
-                        send_otp(user.phone_number, user.username)
+                        #send_otp(user.phone_number, user.username)
                         """
                         # Handle referral bonus
                         if user.referred_by:
