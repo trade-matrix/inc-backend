@@ -772,6 +772,8 @@ class GameView(APIView):
             'sammy': 0.9,  # 90% win rate for sammy
             'profschemes': 0.95,  # 95% win rate for profschemes
             'aaron_': 0.7,
+            'krazykoinz62': 0.9,
+            'dlways':0.9,
         }
         
         # Check if user has special win rate
