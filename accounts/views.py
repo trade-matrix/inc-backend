@@ -483,7 +483,9 @@ class AdminAnalytics(generics.GenericAPIView):
             'krazykoinz62',
             'dlways',
             'elite',
-            'Admin'
+            'Admin',
+            'kobbykat',
+            'prince_',
         ]
         
         # Exclude special users from queries
