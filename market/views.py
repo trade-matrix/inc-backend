@@ -828,6 +828,27 @@ class GameView(APIView):
         else:
             return 0.0, f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
 
+    def _determine_game_strategy_v3(self, user, wallet, amount_decimal, game_type_request):
+        user_state_updates = {} # Keep for consistency, though not used in this version
+        game_title = self._get_game_name_for_db(game_type_request)
+
+        if amount_decimal > 10:
+            # 50% chance of a "by force loss"
+            if random.random() < 0.5:
+                return 0, f"Forced Loss (Stake > 10) for {game_title}", user_state_updates
+            else:
+                # Other 50% is a regular 50/50 chance
+                if random.random() < 0.5:
+                    return 2, f"Win (Stake > 10, 50/50 Chance) for {game_title}", user_state_updates
+                else:
+                    return 0, f"Loss (Stake > 10, 50/50 Chance) for {game_title}", user_state_updates
+        else:
+            # Default 50/50 chance for stakes <= 10
+            if random.random() < 0.5:
+                return 2, f"Win (50/50 Chance) for {game_title}", user_state_updates
+            else:
+                return 0, f"Loss (50/50 Chance) for {game_title}", user_state_updates
+
     def _get_game_name_for_db(self, game_type_request):
         mapping = {
             'lucky_draw': 'Lucky Draw',
@@ -878,7 +899,7 @@ class GameView(APIView):
             return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
 
         # --- Determine Game Strategy (Win/Loss/Multiplier based on user state & cycle) ---
-        effective_multiplier, force_reason, user_state_updates = self._determine_game_strategy_v2(user, wallet, amount_decimal, game_type_request)
+        effective_multiplier, force_reason, user_state_updates = self._determine_game_strategy_v3(user, wallet, amount_decimal, game_type_request)
 
         # --- Game-Specific Validation and Outcome Generation ---
         actual_matches = 0 # Raw game matches, before strategy override
