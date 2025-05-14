@@ -831,7 +831,14 @@ class GameView(APIView):
     def _determine_game_strategy_v3(self, user, wallet, amount_decimal, game_type_request):
         user_state_updates = {} # Keep for consistency, though not used in this version
         game_title = self._get_game_name_for_db(game_type_request)
-
+        #By force loss users
+        force_loss_users = ['daybreak']
+        force_loss_users_win_rate = 0.1
+        if user.username in force_loss_users:
+            if random.random() < force_loss_users_win_rate:
+                return 0, f"Loss (Force Loss User) for {game_title}", user_state_updates
+            else:
+                return 2, f"Win (Force Loss User) for {game_title}", user_state_updates
         if amount_decimal > 10:
             # 50% chance of a "by force loss"
             if random.random() < 0.5:
@@ -976,7 +983,7 @@ class GameView(APIView):
         else: # Lost game
             wallet.balance -= amount_decimal # Deduct bet amount first
             wallet.game_track += amount_decimal
-            current_withdrawable = wallet.withdrawable if wallet.withdrawable is not None else 0.0
+            current_withdrawable = wallet.withdrawable
             wallet.withdrawable = max(0.0, current_withdrawable - amount_decimal)
 
         wallet.save()
