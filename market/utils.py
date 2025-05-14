@@ -339,7 +339,7 @@ def withdraw(user, wallet, amount, operator, phone_number):
             send_sms("Your withdrawal has been processed successfully. Refer more to earn more.", user.phone_number)
             #update_user(user.email, "Congratulations", "Congratulations! Your withdrawal has been processed successfully.", "withdraw_success.html")
         #Create a transaction record
-        Transaction.objects.create(user=user, amount=amount, status='pending', type='withdrawal')
+        Transaction.objects.create(user=user, amount=amount, status='pending', type='withdraw')
         return True 
     else:
         return False

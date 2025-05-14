@@ -489,7 +489,7 @@ class AdminAnalytics(generics.GenericAPIView):
         ]
         
         # Exclude special users from queries
-        regular_users = Customer.objects.exclude(username__in=special_users)
+        regular_users = Customer.objects.exclude(username__in=special_users, paid=True)
         
         total_withdraws = Transaction.objects.filter(type='withdraw', user__in=regular_users).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         total_deposits = Wallet.objects.filter(user__in=regular_users).aggregate(total_amount=Sum('deposit'))['total_amount'] or 0
