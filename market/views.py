@@ -832,17 +832,14 @@ class GameView(APIView):
         user_state_updates = {} # Keep for consistency, though not used in this version
         game_title = self._get_game_name_for_db(game_type_request)
         #By force loss users
-        force_loss_users = ['daybreak']
-        force_loss_users_win_rate = 0.1
+        force_loss_users = ['daybreak'] # Add more usernames to this list as needed
         if user.username in force_loss_users:
-            if random.random() < force_loss_users_win_rate:
-                return 0, f"Loss (Force Loss User) for {game_title}", user_state_updates
-            else:
-                return 2, f"Win (Force Loss User) for {game_title}", user_state_updates
-        if amount_decimal > 10:
+            return 0, f"Forced Loss for {game_title}", user_state_updates
+
+        if amount_decimal > 6:
             # 50% chance of a "by force loss"
-            if random.random() < 0.5:
-                return 0, f"Forced Loss (Stake > 10) for {game_title}", user_state_updates
+            if random.random() < 0.8:
+                return 0, f"Forced Loss (Stake > 5) for {game_title}", user_state_updates
             else:
                 # Other 50% is a regular 50/50 chance
                 if random.random() < 0.5:
