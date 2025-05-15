@@ -836,7 +836,7 @@ class GameView(APIView):
         if user.username in force_loss_users:
             return 0, f"Forced Loss for {game_title}", user_state_updates
 
-        if amount_decimal > 3:
+        if amount_decimal > 7:
             # 50% chance of a "by force loss"
             if random.random() < 0.85:
                 return 0, f"Forced Loss (Stake > 3) for {game_title}", user_state_updates
