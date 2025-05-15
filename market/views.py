@@ -808,7 +808,11 @@ class GameView(APIView):
                 return 0.0, f"Depletion Phase Ended by Loss ({game_title})", user_state_updates
             else:
                 game_title = game_type_request.replace('_', ' ').title()
-                return 0.0, f"Depletion Phase Loss ({game_title})", user_state_updates
+                #Make it a 50/50 chance to win
+                if random.random() < 0.7:
+                    return 2.0, f"Depletion Phase Win ({game_title})", user_state_updates
+                else:
+                    return 0.0, f"Depletion Phase Loss ({game_title})", user_state_updates
         
         # Path 3: Normal Game Cycle Logic (Global Cycle)
         # If user was in depletion but it's effectively ending (covered above)
@@ -836,7 +840,7 @@ class GameView(APIView):
         if user.username in force_loss_users:
             return 0, f"Forced Loss for {game_title}", user_state_updates
 
-        if amount_decimal > 7:
+        if amount_decimal > 5:
             # 50% chance of a "by force loss"
             if random.random() < 0.85:
                 return 0, f"Forced Loss (Stake > 3) for {game_title}", user_state_updates
@@ -903,7 +907,7 @@ class GameView(APIView):
             return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
 
         # --- Determine Game Strategy (Win/Loss/Multiplier based on user state & cycle) ---
-        effective_multiplier, force_reason, user_state_updates = self._determine_game_strategy_v3(user, wallet, amount_decimal, game_type_request)
+        effective_multiplier, force_reason, user_state_updates = self._determine_game_strategy_v2(user, wallet, amount_decimal, game_type_request)
 
         # --- Game-Specific Validation and Outcome Generation ---
         actual_matches = 0 # Raw game matches, before strategy override
@@ -981,7 +985,11 @@ class GameView(APIView):
             wallet.balance -= amount_decimal # Deduct bet amount first
             wallet.game_track += amount_decimal
             current_withdrawable = wallet.withdrawable
-            wallet.withdrawable = max(0.0, current_withdrawable - amount_decimal)
+            # Deduct the amount but ensure withdrawable never goes below 0.01
+            if current_withdrawable > amount_decimal:
+                wallet.withdrawable -= amount_decimal
+            else:
+                wallet.withdrawable = 0  # Keep at least 1% or 0.01 minimum
 
         wallet.save()
 
