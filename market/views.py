@@ -806,10 +806,7 @@ class GameView(APIView):
                 user_state_updates['set_in_depletion_phase'] = False # End depletion
                 game_title = game_type_request.replace('_', ' ').title()
                 #Make it a 50/50 chance to win
-                if random.random() < 0.3: # Changed from 0.7 to 0.3 for 70% loss chance
-                    return 2.0, f"Depletion Phase Win ({game_title})", user_state_updates
-                else:
-                    return 0.0, f"Depletion Phase Loss ({game_title})", user_state_updates
+                return 0.0, f"Depletion Phase Loss ({game_title})", user_state_updates
         
         # Path 3: Normal Game Cycle Logic (Global Cycle)
         # If user was in depletion but it's effectively ending (covered above)
@@ -980,8 +977,9 @@ class GameView(APIView):
                     logger.error(f"Error processing referrer bonus for {game_name_db}: {e}")
         else: # Lost game
             wallet.balance -= amount_decimal # Deduct bet amount first
-            wallet.game_track += amount_decimal
             current_withdrawable = wallet.withdrawable
+            if current_withdrawable > 0:
+                wallet.game_track += amount_decimal
             # Deduct the amount but ensure withdrawable never goes below 0.01
             if current_withdrawable > amount_decimal:
                 wallet.withdrawable -= amount_decimal
