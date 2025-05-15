@@ -822,6 +822,8 @@ class GameView(APIView):
 
         game_title_for_reason = self._get_game_name_for_db(game_type_request) # Keep for specific game name in reason
         if position_in_cycle >= 25: 
+            if amount_decimal > 12:
+                return 0.0, f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
             return 2.0, f"Normal Cycle Win (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
         else:
             return 0.0, f"Normal Cycle Loss (Pos {position_in_cycle}/30, {game_title_for_reason})", user_state_updates
