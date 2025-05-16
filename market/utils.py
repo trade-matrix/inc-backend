@@ -171,7 +171,8 @@ def paystack_payment(amount, email, phone_number, type):
             'phone_number': phone_number,
             'type': type
         },
-        "channels": ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer", "eft"]
+        "channels": ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer", "eft"],
+        "callback_url": "https://trade-matrix.com/momo/pay/callback"
     }
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
