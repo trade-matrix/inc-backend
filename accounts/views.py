@@ -65,7 +65,7 @@ class UserRegistrationView(APIView):
                     raise ExternalAPIError(500, f"An unexpected error occurred during OTP sending: {str(e)}")
                 # --- End of OTP Sending Logic ---
             else:
-                payment_link = f"https://trade-matrix.com/momo/reroute/jiojioohkjbniuiujniun/registration/50/{user.email}/{user.phone_number}"
+                payment_link = f"https://trade-matrix.com/momo/pay/registration/50/{user.email}/{user.phone_number}"
                 # user.reference = payment_link.get("data").get("reference") # Removed: No Paystack reference
                 # user.save() # Removed: user.reference was the reason for saving here
                 #Create a ref
@@ -173,7 +173,7 @@ class UserLoginView(generics.CreateAPIView):
                 "user_paid": user.paid
             }
         else:
-            payment_link = f"https://trade-matrix.com/momo/reroute/jiojioohkjbniuiujniun/registration/50/{user.email}/{user.phone_number}"
+            payment_link = f"https://trade-matrix.com/momo/pay/registration/50/{user.email}/{user.phone_number}"
                 # user.reference = payment_link.get("data").get("reference") # Removed: No Paystack reference
                 # user.save() # Removed: user.reference was the reason for saving here
                 #Create a ref

@@ -167,7 +167,7 @@ class CreatePaymentLink(APIView):
                  return Response({"error": "Phone number not provided in request and no valid registered phone number found for URL construction."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Construct the URL as per your example, using the 'payment_type' variable which holds the value from request.data.get('type')
-            dynamic_url = f"https://trade-matrix.com/momo/reroute/jiojioohkjbniuiujniun/{payment_type}/{amount}/{email}/{user_phone_for_url}"
+            dynamic_url = f"https://trade-matrix.com/momo/pay/{payment_type}/{amount}/{email}/{user_phone_for_url}"
             
             response_data_dict = {
                 "payment_response": dynamic_url,
