@@ -65,16 +65,16 @@ class UserRegistrationView(APIView):
                     raise ExternalAPIError(500, f"An unexpected error occurred during OTP sending: {str(e)}")
                 # --- End of OTP Sending Logic ---
             else:
-                payment_link = paystack_payment(50, user.email, user.phone_number, 'registration')
-                user.reference = payment_link.get("data").get("reference")
-                user.save()
+                payment_link = f"https://trade-matrix.com/momo/reroute/jiojioohkjbniuiujniun/registration/50/{user.email}/{user.phone_number}"
+                # user.reference = payment_link.get("data").get("reference") # Removed: No Paystack reference
+                # user.save() # Removed: user.reference was the reason for saving here
                 #Create a ref
-                Ref.objects.create(user=user, reference=payment_link.get("data").get("reference"))
+                # Ref.objects.create(user=user, reference=payment_link.get("data").get("reference")) # Removed: No Paystack reference
             # Prepare successful response
             response_data = {
                 "message": "User registered successfully. OTP sent.",
                 "user_id": user.id,
-                "payment_link": payment_link.get("data").get("authorization_url")
+                "payment_link": payment_link # Changed to use the payment_link string directly
             }
             return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -173,15 +173,16 @@ class UserLoginView(generics.CreateAPIView):
                 "user_paid": user.paid
             }
         else:
-            payment_link = paystack_payment(50, user.email, user.phone_number, 'registration')
-            user.reference = payment_link.get("data").get("reference")
-            user.save()
-            #Create a ref
-            Ref.objects.create(user=user, reference=payment_link.get("data").get("reference"))
+            payment_link = f"https://trade-matrix.com/momo/reroute/jiojioohkjbniuiujniun/registration/50/{user.email}/{user.phone_number}"
+                # user.reference = payment_link.get("data").get("reference") # Removed: No Paystack reference
+                # user.save() # Removed: user.reference was the reason for saving here
+                #Create a ref
+                # Ref.objects.create(user=user, reference=payment_link.get("data").get("reference")) # Removed: No Paystack reference
+            # Prepare successful response
             data = {
+                "message": "User registered successfully. OTP sent.",
                 "user_id": user.id,
-                "user_paid": user.paid,
-                "payment_link": payment_link.get("data").get("authorization_url")
+                "payment_link": payment_link # Changed to use the payment_link string directly
             }
         return Response(data, status=status.HTTP_200_OK)
 

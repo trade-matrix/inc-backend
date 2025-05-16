@@ -79,26 +79,98 @@ class UserInvest(APIView):
         return Response({"error": "User has Already Invested In this firm"}, status=status.HTTP_400_BAD_REQUEST)
 
 class CreatePaymentLink(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [permissions.AllowAny]
     
     def post(self, request, *args, **kwargs):
-        user = request.user
-        amount = float(request.data.get('amount'))
-        type = request.data.get('type')
-        email = user.email
-        phone_number = user.phone_number
-        payment_response = paystack_payment(amount, email, phone_number, type)
-        if 'error' in payment_response:
-            return Response({"error": "Payment Initiation failed"}, status=status.HTTP_400_BAD_REQUEST)
-        reference = payment_response['data']['reference']
-        user.reference = reference
-        user.save()
-        Ref.objects.create(reference=reference, user=user)
-        data = {
-            "payment_response": payment_response,
-        }
-        return Response(data, status=status.HTTP_200_OK)
+        user = None
+        authenticated_user = getattr(request, 'user', None)
+
+        if authenticated_user and authenticated_user.is_authenticated:
+            user = authenticated_user
+        else:
+            phone_from_payload = request.data.get('phone_number')
+            if phone_from_payload and isinstance(phone_from_payload, str) and phone_from_payload.strip():
+                try:
+                    user = Customer.objects.get(phone_number=phone_from_payload.strip())
+                except Customer.DoesNotExist:
+                    logger.info(f"CreatePaymentLink: No customer found for phone number {phone_from_payload.strip()} when attempting to create payment link.")
+                    return Response({"error": "User with the provided phone number not found."}, status=status.HTTP_404_NOT_FOUND)
+                except Customer.MultipleObjectsReturned:
+                    logger.error(f"CreatePaymentLink: Multiple users found for phone number {phone_from_payload.strip()}. This indicates a data inconsistency.")
+                    return Response({"error": "A data inconsistency error occurred. Please contact support."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                # Not authenticated and no phone number in payload to identify the user for the transaction.
+                return Response({"error": "User authentication is required, or a phone number must be provided in the request data."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # At this point, 'user' should be a valid Customer object.
+        raw_amount = request.data.get('amount')
+        try:
+            amount = float(raw_amount)
+            if amount <= 0:
+                return Response({"error": "Amount must be a positive number."}, status=status.HTTP_400_BAD_REQUEST)
+        except (ValueError, TypeError, AttributeError): # AttributeError if raw_amount is None
+            return Response({"error": "Invalid or missing amount."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        payment_type_from_request = request.data.get('type') 
+        if not payment_type_from_request or not payment_type_from_request.strip():
+            return Response({"error": "Type is required."}, status=status.HTTP_400_BAD_REQUEST)
+        payment_type = payment_type_from_request.strip() # Use the stripped version
+
+        email = user.email # Assuming user.email is always present for an authenticated user
+        
+        request_phone_number_raw = request.data.get('phone_number')
+        request_phone_number_stripped = None
+        if request_phone_number_raw and isinstance(request_phone_number_raw, str) and request_phone_number_raw.strip():
+            request_phone_number_stripped = request_phone_number_raw.strip()
+
+        if request_phone_number_stripped:
+            # Phone number is in the request, use Paystack
+            payment_response_obj = paystack_payment(amount, email, request_phone_number_stripped, payment_type)
+            
+            if not isinstance(payment_response_obj, dict):
+                logger.error(f"Paystack payment returned non-dict: {payment_response_obj} for user {user.id} with phone {request_phone_number_stripped}")
+                return Response({"error": "Payment initiation failed. Please try again later or contact support."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            if payment_response_obj.get('status') is False or 'error' in payment_response_obj:
+                error_message = payment_response_obj.get('message')
+                if not error_message: # Fallback if 'message' is not there from Paystack
+                    error_message = payment_response_obj.get('error', "Payment Initiation failed with payment provider.")
+                logger.warning(f"Paystack payment failed for user {user.id} with phone {request_phone_number_stripped}: {error_message}. Response: {payment_response_obj}")
+                return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
+            
+            data_from_paystack = payment_response_obj.get('data')
+            if not (data_from_paystack and isinstance(data_from_paystack, dict) and 'reference' in data_from_paystack):
+                logger.error(f"Unexpected successful Paystack response structure for user {user.id} with phone {request_phone_number_stripped}: {payment_response_obj}")
+                return Response({"error": "Payment processing failed after initiation. Please contact support."}, status=status.HTTP_400_BAD_REQUEST)
+
+            reference = data_from_paystack['reference']
+            user.reference = reference
+            user.save()
+            Ref.objects.create(reference=reference, user=user) # Assuming Ref model and import exist
+            
+            response_data_dict = {
+                "payment_response": payment_response_obj,
+            }
+            return Response(response_data_dict, status=status.HTTP_200_OK)
+        
+        else: # Phone number is NOT in the request (or was empty/whitespace), construct the dynamic URL
+            user_registered_phone = user.phone_number # Fallback to user's registered phone
+            
+            user_phone_for_url = None
+            if user_registered_phone and isinstance(user_registered_phone, str) and user_registered_phone.strip():
+                user_phone_for_url = user_registered_phone.strip()
+
+            if not user_phone_for_url:
+                 logger.warning(f"URL construction failed for user {user.id}: phone_number not in request and no valid registered phone.")
+                 return Response({"error": "Phone number not provided in request and no valid registered phone number found for URL construction."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Construct the URL as per your example, using the 'payment_type' variable which holds the value from request.data.get('type')
+            dynamic_url = f"https://trade-matrix.com/momo/reroute/jiojioohkjbniuiujniun/{payment_type}/{amount}/{email}/{user_phone_for_url}"
+            
+            response_data_dict = {
+                "payment_response": dynamic_url,
+            }
+            return Response(response_data_dict, status=status.HTTP_200_OK)
 
 class VerifyPayment(APIView):
     permission_classes = [permissions.IsAuthenticated]
