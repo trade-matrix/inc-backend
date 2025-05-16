@@ -173,7 +173,7 @@ CHANNEL_LAYERS = {
 }
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",'https://tm-hub.com/','https://trade-matrix-v2.vercel.app/', 'https://www.tm-hub.com/', 'https://trade-matrix-v2.vercel.app/'
+    "http://localhost:5173",'https://tm-hub.com/','https://trade-matrix-v2.vercel.app/', 'https://www.tm-hub.com/', 'https://trade-matrix-v2.vercel.app/', 'https://trade-matrix.com/', 'https://www.trade-matrix.com/', 'http://localhost:8000'
 ]
 CORS_ALLOW_METHODS = [
     "GET",
