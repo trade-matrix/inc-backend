@@ -82,10 +82,12 @@ class CreatePaymentLink(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request, *args, **kwargs):
-        user = None
-        authenticated_user = getattr(request, 'user', None)
+        try:
+            authenticated_user = Customer.objects.get(pk=request.data.get('user_id'))
+        except:
+            authenticated_user = None
 
-        if authenticated_user and authenticated_user.is_authenticated:
+        if authenticated_user:
             user = authenticated_user
         else:
             phone_from_payload = request.data.get('phone_number')
