@@ -12,7 +12,7 @@ from accounts.models import Customer, Ref
 from .utils import send_sms, check_momo, status_check, withdraw, paystack_payment, paystack_create_recipient, paystack_send_money, paystack_balance_check, update_user, distribute_pool_earnings
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
-from accounts.utils import send_otp
+#from accounts.utils import send_otp
 import json
 from django.views.decorators.csrf import csrf_exempt
 import datetime
@@ -420,11 +420,11 @@ class WebhookView(APIView):
                         #Create and update user's wallet
                         wallet,_ = Wallet.objects.get_or_create(user=user)
                         wallet.deposit += 50
-                        wallet.balance += 50
+                        wallet.balance += 100
                         wallet.save()
                         # Send OTP
                         #send_otp(user.phone_number, user.username)
-                        """
+                        
                         # Handle referral bonus
                         if user.referred_by:
                             referrer = user.referred_by
@@ -432,19 +432,14 @@ class WebhookView(APIView):
                                 referrer.affiliate = True
                                 referrer.save()
                             referrer_wallet = Wallet.objects.get(user=referrer)
-                            referrer_wallet.withdrawable += 100
-                            referrer_wallet.balance += 100
+                            referrer_wallet.withdrawable += 10
+                            referrer_wallet.balance += 10
                             referrer_wallet.save()
-                            Transaction.objects.create(user=referrer, amount=100, status='completed', type='referal', reffered=user.username)
+                            Transaction.objects.create(user=referrer, amount=10, status='completed', type='referal', reffered=user.username)
 
-                        # Handle vendor bonus
-                        if user.vendor:
-                            vendor = user.vendor
-                            vendor_wallet = Wallet.objects.get(user=vendor.user)
-                            vendor_wallet.balance += 20
-                            vendor_wallet.withdrawable += 20
-                            vendor_wallet.save()
-                        """   
+                            # Send SMS to referrer
+                            send_sms(f"Congratulations! You just earned GHS 10 for referring {user.username}. Your new balance is GHS {referrer_wallet.balance}.", referrer.phone_number)
+                          
                     except Exception as e:
                         logger.error(f"Registration webhook error: {str(e)}")
                         return JsonResponse({"error": str(e)}, status=500)
@@ -470,8 +465,8 @@ class WebhookView(APIView):
                     wallet, created = Wallet.objects.get_or_create(user=user)
                     # Update wallet balance
                     wallet.deposit += amount # Ensure Decimal type
-                    wallet.balance += amount
-                    wallet.withdrawable += amount*0.95
+                    wallet.balance += amount*2
+                    wallet.withdrawable += amount
                     wallet.save()
                     # Record transaction
                     Transaction.objects.create(user=user, amount=Decimal(str(amount)), status='completed', type='deposit')
@@ -1029,6 +1024,7 @@ class GameView(APIView):
             wallet.withdrawable += winnings
             
             # Referrer bonus (now game-specific)
+            """
             referrer = user.referred_by
             if referrer and not referrer.has_taken_referral_bonus:
                 try:
@@ -1051,6 +1047,7 @@ class GameView(APIView):
                     logger.error(f"Referrer wallet not found for user {referrer.id} during {game_name_db} bonus.")
                 except Exception as e:
                     logger.error(f"Error processing referrer bonus for {game_name_db}: {e}")
+            """
         else: # Lost game
             wallet.balance -= amount_decimal # Deduct bet amount first
             current_withdrawable = wallet.withdrawable
