@@ -1279,7 +1279,7 @@ class DataforUsers(APIView):
         total_wins = int(games_total + withdrawable_total) or base_total_wins
 
         # Wins for today (reasonable daily amount)
-        today_wins = random.randint(0, min(50, max(1, total_wins // 20))) + int(user_wallet.withdrawable or 0)
+        today_wins = int(user_wallet.withdrawable or 0)
         if today_wins < 0:
             today_wins = 0
         # Best win (should be realistic but impressive)
