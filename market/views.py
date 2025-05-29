@@ -871,7 +871,7 @@ class GameView(APIView):
         # Path 2: Balance Depletion Phase (Global)
         if user.in_depletion_phase:
             non_withdrawable_after_potential_loss = wallet.game_track
-            if non_withdrawable_after_potential_loss >= 50.0:
+            if non_withdrawable_after_potential_loss >= 100.0:
                 user_state_updates['set_in_depletion_phase'] = False # End depletion
                 game_title = game_type_request.replace('_', ' ').title()
                 #Make it a 50/50 chance to win

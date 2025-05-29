@@ -1,9 +1,11 @@
 def message_decider(message, customer, percentage):
     if message == 'news':
         return f"""
-            Hello {customer.username},
-Withdrawals are open again. Visit your profile now to reprocess your withdrawals. Sorry for any inconveniences caused.
-The Trade-Matrix team.
+Hello Gamer,
+Exciting news! We are thrilled to announce we are offering 100% bonus on all deposits made on our platform today.
+This means if you deposit GH₵10, you will receive an additional GH₵10, giving you a total of GH₵20 to play with.
+Play your favorite games and win big with this limited-time offer. All winnings can be withdrawn instantly.
+Don't miss out on this opportunity to boost your wins.
 """
     elif message == 'promo':
         return f"""
