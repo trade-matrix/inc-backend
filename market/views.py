@@ -1276,10 +1276,10 @@ class DataforUsers(APIView):
         )
         games_total = total_wins_aggregate['games_wins'] or 0
         withdrawable_total = total_wins_aggregate['withdrawable_total'] or 0
-        total_wins = games_total + withdrawable_total or base_total_wins
+        total_wins = int(games_total + withdrawable_total) or base_total_wins
 
         # Wins for today (reasonable daily amount)
-        today_wins = random.randint(0, min(50, total_wins // 20)) + user_wallet.withdrawable
+        today_wins = random.randint(0, min(50, max(1, total_wins // 20))) + int(user_wallet.withdrawable or 0)
         if today_wins < 0:
             today_wins = 0
         # Best win (should be realistic but impressive)
@@ -1290,11 +1290,13 @@ class DataforUsers(APIView):
         current_streak = random.choices(range(len(streak_weights)), weights=streak_weights)[0]
         
         # Additional metrics
-        total_games_played = total_wins + random.randint(total_wins // 3, total_wins * 2)
-        win_percentage = round((total_wins / total_games_played) * 100, 1)
+        min_games = max(1, total_wins // 3)
+        max_games = max(min_games + 1, total_wins * 2)
+        total_games_played = total_wins + random.randint(min_games, max_games)
+        win_percentage = round((total_wins / max(total_games_played, 1)) * 100, 1)
         
         # Weekly wins (last 7 days)
-        weekly_wins = random.randint(today_wins, min(today_wins * 7, total_wins // 4))
+        weekly_wins = random.randint(today_wins, min(today_wins * 7, max(today_wins + 1, total_wins // 4)))
         
         data = {
             "total_wins": total_wins,
