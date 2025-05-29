@@ -21,12 +21,14 @@ from django.utils import timezone  # Use Django's timezone utility
 #pagination
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
+
 import logging
 import random
 from django.db.models import F # Not used currently, but keep for potential atomic updates
 from django.db import transaction # Import transaction
 from decimal import Decimal  # Add this import for Decimal type
-
+#Import Sum
+from django.db.models import Sum
 # Game constants (can be defined at class level or globally)
 LUCKY_DRAW_MIN_NUMBER = 1
 LUCKY_DRAW_MAX_NUMBER = 30
@@ -1255,7 +1257,9 @@ class DataforUsers(APIView):
     
     def get(self, request, *args, **kwargs):
         user = request.user
-        
+        user_wallet = Wallet.objects.filter(user=user).first()
+        if not user_wallet:
+            return Response({"error": "User wallet not found"}, status=status.HTTP_404_NOT_FOUND)
         # Use user ID and current date as seeds for consistency
         today = timezone.now().date()
         user_seed = user.id * 1000 + today.toordinal()
@@ -1266,11 +1270,18 @@ class DataforUsers(APIView):
         base_total_wins = 500 + (days_since_registration * random.randint(2, 8))
         
         # Total wins (always increasing)
-        total_wins = base_total_wins + random.randint(0, 100)
-        
+        total_wins_aggregate = Wallet.objects.all().aggregate(
+            games_wins=Sum('amount_from_games'),
+            withdrawable_total=Sum('withdrawable')
+        )
+        games_total = total_wins_aggregate['games_wins'] or 0
+        withdrawable_total = total_wins_aggregate['withdrawable_total'] or 0
+        total_wins = games_total + withdrawable_total or base_total_wins
+
         # Wins for today (reasonable daily amount)
-        today_wins = random.randint(0, min(50, total_wins // 20))
-        
+        today_wins = random.randint(0, min(50, total_wins // 20)) + user_wallet.withdrawable
+        if today_wins < 0:
+            today_wins = 0
         # Best win (should be realistic but impressive)
         best_win = random.randint(max(100, total_wins // 10), max(500, total_wins // 5))
         
