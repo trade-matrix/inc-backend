@@ -23,4 +23,5 @@ urlpatterns = [
     path('revert/', RevertWithdrawals.as_view(), name='revert'),
     path('distribute-pool/', DistributePoolEarnings.as_view(), name='distribute-pool'),
     path('pool-status/', UserPoolGroupStatus.as_view(), name='pool-status'),
+    path('data/', DataforUsers.as_view(), name='user-data'),
 ]
